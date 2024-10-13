@@ -36,5 +36,5 @@ jobs:
       - name: Deploy to the server
         run: |
           scp -r * ${{ secrets.USER_NAME }}@${{ secrets.SERVER_IP }}:/home/gh/vault-copy
-          ssh gh@84.201.180.64 "sudo mv /home/gh/vault-copy/ /vault-copy/"
+          ssh gh@84.201.180.64 "sudo mv /home/gh/vault-copy /vault-copy"
           ssh gh@84.201.180.64 "sudo chown -R root:root /vault-copy/ && sudo chmod 755 /vault-copy/
