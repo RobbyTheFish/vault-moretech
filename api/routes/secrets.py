@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException
-from core.master import SecretManagerModule
+from core.master.master_module import SecretManagerModule
 from api.models.secrets import SecretRequest, SecretQuery  # Импортируем модели
 
 
