@@ -31,4 +31,4 @@ jobs:
 
       - name: Deploy to the server
         run: |
-          scp -r ./ user@your_server_ip:/vault-copy
+          scp -r ./ ${{ secrets.USER_NAME }}@${{ secrets.SERVER_IP }}:/vault-copy
