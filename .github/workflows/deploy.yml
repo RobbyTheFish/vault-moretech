@@ -40,5 +40,5 @@ jobs:
           tar -cvf deploy.tar ../build/
           scp deploy.tar ${{ secrets.USER_NAME }}@${{ secrets.SERVER_IP }}:/home/gh/
           ssh gh@84.201.180.64 "tar -xvf /home/gh/deploy.tar"
-          ssh gh@84.201.180.64 "sudo mv /home/gh/deploy /vault-copy"
+          ssh gh@84.201.180.64 "sudo mv /home/gh/build /vault-copy"
           ssh gh@84.201.180.64 "sudo chown -R root:root /vault-copy/ && sudo chmod 755 /vault-copy/"
