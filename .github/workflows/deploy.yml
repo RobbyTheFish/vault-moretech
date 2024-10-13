@@ -38,7 +38,9 @@ jobs:
           mkdir ../build
           cp -TR . ../build
           tar -cvf deploy.tar ../build/
-          scp deploy.tar ${{ secrets.USER_NAME }}@${{ secrets.SERVER_IP }}:/home/gh/
-          ssh gh@84.201.180.64 "tar -xvf /home/gh/deploy.tar"
-          ssh gh@84.201.180.64 "sudo mv /home/gh/build /vault-copy"
-          ssh gh@84.201.180.64 "sudo chown -R root:root /vault-copy/ && sudo chmod 755 /vault-copy/"
+          scp deploy.tar ${{ secrets.USER_NAME }}@${{ secrets.SERVER_IP }}:/home/${{ secrets.USER_NAME }}/
+          ssh ${{ secrets.USER_NAME }}@${{ secrets.SERVER_IP }} "tar -xvf /home/${{ secrets.USER_NAME }}/deploy.tar"
+          ssh ${{ secrets.USER_NAME }}@${{ secrets.SERVER_IP }} "rm /home/${{ secrets.USER_NAME }}/deploy.tar"
+          ssh ${{ secrets.USER_NAME }}@${{ secrets.SERVER_IP }} "sudo rm -rf /vault-copy"
+          ssh ${{ secrets.USER_NAME }}@${{ secrets.SERVER_IP }} "sudo mv /home/${{ secrets.USER_NAME }}/build /vault-copy"
+          ssh ${{ secrets.USER_NAME }}@${{ secrets.SERVER_IP }} "sudo chown -R root:root /vault-copy/ && sudo chmod 755 /vault-copy/"
