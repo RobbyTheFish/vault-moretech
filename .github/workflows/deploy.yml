@@ -39,6 +39,6 @@ jobs:
 
       - name: Build with Docker
         run: |
-          ssh ${{ secrets.USER_NAME }}@${{ secrets.SERVER_IP }} "sudo cp /home/${{ secrets.USER_NAME }}/.env /vault-copy"
-          ssh ${{ secrets.USER_NAME }}@${{ secrets.SERVER_IP }} "sudo docker compose -f /vault-copy/docker-compose.yaml down"
-          ssh ${{ secrets.USER_NAME }}@${{ secrets.SERVER_IP }} "sudo docker compose -f /vault-copy/docker-compose.yaml up -d --build"
+          ssh ${{ secrets.USER_NAME }}@${{ secrets.SERVER_IP }} "sudo cp /home/${{ secrets.USER_NAME }}/.env /vault-moretech"
+          ssh ${{ secrets.USER_NAME }}@${{ secrets.SERVER_IP }} "sudo docker compose -f /vault-moretech/docker-compose.yaml down"
+          ssh ${{ secrets.USER_NAME }}@${{ secrets.SERVER_IP }} "sudo docker compose -f /vault-moretech/docker-compose.yaml up -d --build"
