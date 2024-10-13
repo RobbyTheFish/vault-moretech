@@ -35,7 +35,7 @@ jobs:
 
       - name: Deploy to the server
         run: |
-          ssh ${{ secrets.USER_NAME }}@${{ secrets.SERVER_IP }} "cp /vault-moretech && sudo git pull origin main"
+          ssh ${{ secrets.USER_NAME }}@${{ secrets.SERVER_IP }} "cd /vault-moretech && sudo git pull origin main"
 
       - name: Build with Docker
         run: |
