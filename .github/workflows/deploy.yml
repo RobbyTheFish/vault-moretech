@@ -44,3 +44,8 @@ jobs:
           ssh ${{ secrets.USER_NAME }}@${{ secrets.SERVER_IP }} "sudo rm -rf /vault-copy"
           ssh ${{ secrets.USER_NAME }}@${{ secrets.SERVER_IP }} "sudo mv /home/${{ secrets.USER_NAME }}/build /vault-copy"
           ssh ${{ secrets.USER_NAME }}@${{ secrets.SERVER_IP }} "sudo chown -R root:root /vault-copy/ && sudo chmod 755 /vault-copy/"
+
+      - name: Build with Docker
+        run: |
+          ssh ${{ secrets.USER_NAME }}@${{ secrets.SERVER_IP }} "docker compose -f /vault-copy/docker-compose.yaml down"
+          ssh ${{ secrets.USER_NAME }}@${{ secrets.SERVER_IP }} "docker compose -f /vault-copy/docker-compose.yaml up --build"
