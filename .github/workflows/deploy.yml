@@ -35,8 +35,8 @@ jobs:
 
       - name: Deploy to the server
         run: |
-          ssh ${{ secrets.USER_NAME }}@${{ secrets.SERVER_IP }} "sudo git config --global credential.helper store
-          echo "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}" > ~/.git-credentials"
+          ssh ${{ secrets.USER_NAME }}@${{ secrets.SERVER_IP }} "sudo git config --global credential.helper store"
+          ssh ${{ secrets.USER_NAME }}@${{ secrets.SERVER_IP }} "echo "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}" > ~/.git-credentials"
           ssh ${{ secrets.USER_NAME }}@${{ secrets.SERVER_IP }} "git pull origin main"
 
       - name: Build with Docker
