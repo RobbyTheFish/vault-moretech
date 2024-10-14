@@ -35,12 +35,10 @@ jobs:
 
       - name: Deploy to the server
         run: |
-          mkdir ../build
-          cp -TR . ../build
-          tar -cvf deploy.tar ../build/
-          scp deploy.tar ${{ secrets.USER_NAME }}@${{ secrets.SERVER_IP }}:/home/${{ secrets.USER_NAME }}/
-          ssh ${{ secrets.USER_NAME }}@${{ secrets.SERVER_IP }} "tar -xvf /home/${{ secrets.USER_NAME }}/deploy.tar"
-          ssh ${{ secrets.USER_NAME }}@${{ secrets.SERVER_IP }} "rm /home/${{ secrets.USER_NAME }}/deploy.tar"
-          ssh ${{ secrets.USER_NAME }}@${{ secrets.SERVER_IP }} "sudo rm -rf /vault-copy"
-          ssh ${{ secrets.USER_NAME }}@${{ secrets.SERVER_IP }} "sudo mv /home/${{ secrets.USER_NAME }}/build /vault-copy"
-          ssh ${{ secrets.USER_NAME }}@${{ secrets.SERVER_IP }} "sudo chown -R root:root /vault-copy/ && sudo chmod 755 /vault-copy/"
+          ssh ${{ secrets.USER_NAME }}@${{ secrets.SERVER_IP }} "cd /vault-moretech && sudo git pull origin main"
+
+      - name: Build with Docker
+        run: |
+          ssh ${{ secrets.USER_NAME }}@${{ secrets.SERVER_IP }} "sudo cp /home/${{ secrets.USER_NAME }}/.env /vault-moretech"
+          ssh ${{ secrets.USER_NAME }}@${{ secrets.SERVER_IP }} "sudo docker compose -f /vault-moretech/docker-compose.yaml down"
+          ssh ${{ secrets.USER_NAME }}@${{ secrets.SERVER_IP }} "sudo docker compose -f /vault-moretech/docker-compose.yaml up -d --build"

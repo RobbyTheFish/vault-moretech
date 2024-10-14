@@ -45,8 +45,6 @@ services:
     
     volumes:
       - ./alembic/versions:/app/alembic/versions
-      - ./wait-for-it.sh:/wait-for-it.sh
-      - .:/app
 
 
 networks:
