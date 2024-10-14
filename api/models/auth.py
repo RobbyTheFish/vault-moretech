@@ -1,20 +1,15 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
 
-class RoleCreateRequest(BaseModel):
-    name: str
 
-class RoleCreateResponse(BaseModel):
-    status: str
-    role: dict
-    master_token: str
+class UserRegisterRequest(BaseModel):
+    username: str
+    email: EmailStr
+    password: str
 
-class TokenCreateRequest(BaseModel):
-    master_token: str
+class UserLoginRequest(BaseModel):
+    username: str
+    password: str
 
 class TokenResponse(BaseModel):
-    status: str
     access_token: str
-    refresh_token: str
-
-class TokenRefreshRequest(BaseModel):
-    refresh_token: str
+    token_type: str

@@ -1,37 +1,18 @@
-from datetime import datetime, timedelta
-from typing import Optional
-from jose import JWTError, jwt
-from auth.config import Config
+from datetime import timedelta
+from auth.auth_manager import AuthManager
 
-SECRET_KEY = Config.SECRET_KEY
-ALGORITHM = Config.ALGORITHM
+auth_manager = AuthManager()
 
-def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
-    """
-    Создает JWT активный токен.
-    """
-    to_encode = data.copy()
-    expire = datetime.utcnow() + expires_delta if expires_delta else datetime.utcnow() + timedelta(minutes=15)
-    to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-    return encoded_jwt
+def create_access_token(user_id: int):
+    return auth_manager.create_access_token(
+        data={"user_id": user_id}, 
+        expires_delta=timedelta(minutes=AuthManager.ACCESS_TOKEN_EXPIRE_MINUTES)
+    )
 
-def create_refresh_token(data: dict, expires_delta: Optional[timedelta] = None):
-    """
-    Создает JWT токен обновления.
-    """
-    to_encode = data.copy()
-    expire = datetime.utcnow() + expires_delta if expires_delta else datetime.utcnow() + timedelta(days=7)
-    to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-    return encoded_jwt
+def create_refresh_token(user_id: int):
+    return auth_manager.create_refresh_token(
+        data={"user_id": user_id}
+    )
 
 def decode_token(token: str):
-    """
-    Декодирует JWT токен.
-    """
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        return payload
-    except JWTError:
-        return None
+    return auth_manager.decode_token(token)

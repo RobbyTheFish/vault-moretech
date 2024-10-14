@@ -28,7 +28,6 @@ services:
     networks:
       - secret_network
 
-
   secret_manager:
     build: .
     container_name: secret_manager

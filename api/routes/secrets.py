@@ -1,32 +1,44 @@
-from fastapi import APIRouter, HTTPException, Depends, Header
-from core.master.master_module import SecretManagerModule
+from fastapi import APIRouter, Depends, HTTPException
+from auth.dependencies import get_current_user
+from auth.models import Application, UserGroupRole, RoleEnum, User, Group
 from api.models.secrets import SecretRequest, SecretQuery
-from auth.auth_manager import AuthManager
+from auth.db import AsyncSessionLocal
+from sqlalchemy.future import select
+from core.master.master_module import SecretManagerModule
 
 router = APIRouter()
-secret_manager = SecretManagerModule()
-auth_manager = AuthManager()
 
-async def get_current_role(x_auth_token: str = Header(...)):
-    role = await auth_manager.authenticate(x_auth_token)
-    if not role:
-        raise HTTPException(status_code=401, detail="Invalid token")
-    return role
+@router.post("/applications/{application_id}/secrets")
+async def store_secrets(application_id: int, secrets: SecretRequest, current_user: User = Depends(get_current_user)):
+    async with AsyncSessionLocal() as session:
+        # Проверяем, что пользователь имеет доступ к приложению через группу
+        result = await session.execute(
+            select(Application, UserGroupRole).join(Group).join(UserGroupRole).where(
+                Application.id == application_id,
+                UserGroupRole.user_id == current_user
+            )
+        )
+        app_data = result.first()
+        if not app_data:
+            raise HTTPException(status_code=403, detail="Not authorized")
 
-@router.post("/store")
-async def store_secrets(request: SecretRequest, role = Depends(get_current_role)):
-    try:
-        result = await secret_manager.save_secrets(request.app_uuid, request.secrets)
-        return {"status": "success", "result": result}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        ...
 
-@router.get("/retrieve")
-async def retrieve_secret(query: SecretQuery, role = Depends(get_current_role)):
-    try:
-        secret = await secret_manager.retrieve_secret(query.app_uuid, query.secret_key)
-        if not secret:
-            raise HTTPException(status_code=404, detail="Secret not found")
-        return {"status": "success", "secret": secret}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        return {"status": "success"}
+
+@router.get("/applications/{application_id}/secrets/{secret_key}")
+async def retrieve_secret(application_id: int, secrets_keys: SecretQuery, current_user: User = Depends(get_current_user)):
+    async with AsyncSessionLocal() as session:
+        # Проверяем, что пользователь имеет доступ к приложению через группу
+        result = await session.execute(
+            select(Application, UserGroupRole).join(Group).join(UserGroupRole).where(
+                Application.id == application_id,
+                UserGroupRole.user_id == current_user
+            )
+        )
+        app_data = result.first()
+        if not app_data:
+            raise HTTPException(status_code=403, detail="Not authorized")
+
+
+        return {"status": "success", "secret": "secret_value"}
