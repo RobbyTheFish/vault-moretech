@@ -1,8 +1,9 @@
-from os import urandom
-from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
-from cryptography.hazmat.primitives.asymmetric import rsa, padding
-from cryptography.hazmat.primitives import hashes, hmac
 from abc import ABC, abstractmethod
+from os import urandom
+
+from cryptography.hazmat.primitives import hashes, hmac, serialization
+from cryptography.hazmat.primitives.asymmetric import padding
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
 
 class EncryptionStrategy(ABC):
@@ -40,15 +41,15 @@ class ChaCha20EncryptionStrategy(EncryptionStrategy):
     """Стратегия шифрования для ChaCha20-Poly1305."""
 
     def encrypt(self, key: bytes, plaintext: bytes) -> bytes:
-        nonce = urandom(12)
+        nonce = urandom(16)
         cipher = Cipher(algorithms.ChaCha20(key, nonce), mode=None)
         encryptor = cipher.encryptor()
         ciphertext = encryptor.update(plaintext) + encryptor.finalize()
         return nonce + ciphertext
 
     def decrypt(self, key: bytes, ciphertext: bytes) -> bytes:
-        nonce = ciphertext[:12]
-        encrypted_data = ciphertext[12:]
+        nonce = ciphertext[:16]
+        encrypted_data = ciphertext[16:]
         cipher = Cipher(algorithms.ChaCha20(key, nonce), mode=None)
         decryptor = cipher.decryptor()
         return decryptor.update(encrypted_data) + decryptor.finalize()
@@ -57,8 +58,11 @@ class ChaCha20EncryptionStrategy(EncryptionStrategy):
 class RSAEncryptionStrategy(EncryptionStrategy):
     """Стратегия шифрования для RSA."""
 
-    def encrypt(self, key: rsa.RSAPublicKey, plaintext: bytes) -> bytes:
-        return key.encrypt(
+    def encrypt(self, key: bytes, plaintext: bytes) -> bytes:
+        """Использует приватный ключ для шифрования данных (для хранения)."""
+        private_key = serialization.load_pem_private_key(key, password=None)
+        public_key = private_key.public_key()
+        return public_key.encrypt(
             plaintext,
             padding.OAEP(
                 mgf=padding.MGF1(algorithm=hashes.SHA256()),
@@ -67,8 +71,10 @@ class RSAEncryptionStrategy(EncryptionStrategy):
             ),
         )
 
-    def decrypt(self, key: rsa.RSAPrivateKey, ciphertext: bytes) -> bytes:
-        return key.decrypt(
+    def decrypt(self, key: bytes, ciphertext: bytes) -> bytes:
+        """Расшифровывает данные, используя приватный ключ."""
+        private_key = serialization.load_pem_private_key(key, password=None)
+        return private_key.decrypt(
             ciphertext,
             padding.OAEP(
                 mgf=padding.MGF1(algorithm=hashes.SHA256()),

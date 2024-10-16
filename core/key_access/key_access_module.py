@@ -1,8 +1,9 @@
 import os
-from typing import Optional, Any
-from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives.asymmetric import rsa, ec, ed25519
 from abc import ABC, abstractmethod
+from typing import Any, Optional
+
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import ec, ed25519, rsa
 
 
 class KeyGenerationStrategy(ABC):
@@ -95,13 +96,16 @@ class KeyAccessModule:
     }
 
     @staticmethod
-    async def generate_app_key(algorithm: Optional[str] = None) -> Any:
+    async def generate_app_key(algorithm: Optional[str] = None) -> bytes:
         """Генерация ключа шифрования на основе указанного алгоритма."""
         algorithm = algorithm or KeyAccessModule._default_algorithm
         strategy = KeyAccessModule._strategies.get(algorithm)
         if not strategy:
             raise ValueError(f"Unsupported algorithm: {algorithm}")
 
-        # Генерируем ключ
-        key = strategy.generate_key()
-        return key
+        key_app = strategy.generate_key()
+
+        if hasattr(strategy, "serialize_key"):
+            key_app = strategy.serialize_key(key_app)
+
+        return key_app
