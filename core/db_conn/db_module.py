@@ -1,9 +1,10 @@
-import motor.motor_asyncio
-from pymongo import IndexModel, ASCENDING
-from pymongo.errors import DuplicateKeyError
 import asyncio
 
+import motor.motor_asyncio
 from config import Config
+from pymongo import ASCENDING, IndexModel
+from pymongo.errors import DuplicateKeyError
+
 
 class DatabaseModule:
     def __init__(self):
@@ -17,7 +18,7 @@ class DatabaseModule:
 
         self.client = motor.motor_asyncio.AsyncIOMotorClient(mongo_uri)
         self.db = self.client.get_default_database()
-        self.collection = self.db['secrets']
+        self.collection = self.db["secrets"]
 
         asyncio.create_task(self.create_indexes())
 
@@ -26,8 +27,7 @@ class DatabaseModule:
         Create indexes in DB
         """
         index = IndexModel(
-            [('app_uuid', ASCENDING), ('data_key', ASCENDING)],
-            unique=True
+            [("app_uuid", ASCENDING), ("data_key", ASCENDING)], unique=True
         )
         await self.collection.create_indexes([index])
 
@@ -40,16 +40,16 @@ class DatabaseModule:
         :param encrypted_data: Encrypted data.
         """
         document = {
-            'app_uuid': app_uuid,
-            'data_key': data_key,
-            'encrypted_data': encrypted_data
+            "app_uuid": app_uuid,
+            "data_key": data_key,
+            "encrypted_data": encrypted_data,
         }
         try:
             await self.collection.insert_one(document)
         except DuplicateKeyError:
             await self.collection.update_one(
-                {'app_uuid': app_uuid, 'data_key': data_key},
-                {'$set': {'encrypted_data': encrypted_data}}
+                {"app_uuid": app_uuid, "data_key": data_key},
+                {"$set": {"encrypted_data": encrypted_data}},
             )
 
     async def get_data(self, app_uuid, data_key):
@@ -60,12 +60,9 @@ class DatabaseModule:
         :param data_key: Data key.
         :return: encrypted data or None.
         """
-        query = {
-            'app_uuid': app_uuid,
-            'data_key': data_key
-        }
+        query = {"app_uuid": app_uuid, "data_key": data_key}
         document = await self.collection.find_one(query)
         if document:
-            return document.get('encrypted_data')
+            return document.get("encrypted_data")
         else:
             return None
