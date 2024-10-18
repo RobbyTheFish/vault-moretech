@@ -96,7 +96,7 @@ class KeyAccessModule:
     }
 
     @staticmethod
-    async def generate_app_key(algorithm: Optional[str] = None) -> bytes:
+    async def generate_app_key(algorithm: Optional[str] = None) -> tuple[str, bytes]:
         """Генерация ключа шифрования на основе указанного алгоритма."""
         algorithm = algorithm or KeyAccessModule._default_algorithm
         strategy = KeyAccessModule._strategies.get(algorithm)
@@ -108,4 +108,4 @@ class KeyAccessModule:
         if hasattr(strategy, "serialize_key"):
             key_app = strategy.serialize_key(key_app)
 
-        return key_app
+        return algorithm, key_app
