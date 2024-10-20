@@ -4,7 +4,7 @@ from pydantic import BaseModel
 
 
 class Secret_Mongo(BaseModel):
-    application_id: int
+    application_id: str
     secret_key: str
     secret_value: bytes
     is_deleted: bool = False

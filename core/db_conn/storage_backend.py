@@ -16,22 +16,22 @@ from core.db_conn.rdb_models import Base, Secret
 
 class AsyncStorageBackend(ABC):
     @abstractmethod
-    async def read(self, key: str, application_id: int) -> bytes:
+    async def read(self, key: str, application_id: str) -> bytes:
         """Асинхронное чтение данных по ключу"""
         pass
 
     @abstractmethod
-    async def write(self, key: str, value: bytes, application_id: int):
+    async def write(self, key: str, value: bytes, application_id: str):
         """Асинхронная запись данных по ключу"""
         pass
 
     @abstractmethod
-    async def update(self, key: str, value: bytes, application_id: int):
+    async def update(self, key: str, value: bytes, application_id: str):
         """Асинхронное обновление данных по ключу"""
         pass
 
     @abstractmethod
-    async def delete(self, key: str, application_id: int):
+    async def delete(self, key: str, application_id: str):
         """Асинхронное удаление данных по ключу"""
         pass
 
@@ -73,7 +73,7 @@ class RDBStorageBackend(AsyncStorageBackend):
             except SQLAlchemyError as e:
                 raise RuntimeError(f"Ошибка чтения данных: {e}")
 
-    async def write(self, key: str, value: bytes, application_id: int):
+    async def write(self, key: str, value: bytes, application_id: str):
         async with self.session() as session:
             try:
                 new_secret = Secret(
@@ -136,7 +136,7 @@ class MongoDBStorageBackend(AsyncStorageBackend):
         except PyMongoError as e:
             raise RuntimeError(f"Ошибка подключения к MongoDB: {e}")
 
-    async def read(self, key: str, application_id: int) -> bytes:
+    async def read(self, key: str, application_id: str) -> bytes:
         try:
             secret = await self.collection.find_one(
                 {
@@ -149,7 +149,7 @@ class MongoDBStorageBackend(AsyncStorageBackend):
         except PyMongoError as e:
             raise RuntimeError(f"Ошибка чтения из MongoDB: {e}")
 
-    async def write(self, key: str, value: bytes, application_id: int):
+    async def write(self, key: str, value: bytes, application_id: str):
         try:
             new_secret = Secret_Mongo(
                 application_id=application_id, secret_key=key, secret_value=value
