@@ -60,12 +60,14 @@ class RDBStorageBackend(AsyncStorageBackend):
         async with self.engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
 
-    async def read(self, key: str) -> bytes:
+    async def read(self, key: str, application_id: str) -> bytes:
         async with self.session() as session:
             try:
                 result = await session.execute(
                     select(Secret).filter(
-                        Secret.secret_key == key, Secret.is_deleted.is_(False)
+                        Secret.secret_key == key,
+                        Secret.is_deleted.is_(False),
+                        Secret.application_id == application_id,
                     )
                 )
                 secret = result.scalars().first()
