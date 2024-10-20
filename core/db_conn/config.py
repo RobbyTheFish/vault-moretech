@@ -12,4 +12,4 @@ class Config(BaseSettings):
     db_name: str
 
     class Config:
-        env_file = "core/db_conn/.env"
+        env_file = ".env"

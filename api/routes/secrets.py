@@ -1,62 +1,73 @@
 from fastapi import APIRouter, Depends, HTTPException
 from auth.dependencies import get_current_user
-from auth.models import Application, UserGroupRole, RoleEnum, User, Group
+from auth.models import Application, User, Group
 from api.models.secrets import SecretRequest, SecretQuery
-from auth.db import AsyncSessionLocal
 from sqlalchemy.future import select
 from core.master.master_module import SecretManagerModule
+from auth.db import db
+from bson import ObjectId
 
+router = APIRouter(
+    prefix="/api",
+    tags=["Secrets"],
+    dependencies=[Depends(get_current_user)]
+)
 
-router = APIRouter()
 secret_manager_module = SecretManagerModule()
 
 
 @router.post("/applications/{application_id}/secrets")
 async def store_secrets(
-    application_id: int,
+    application_id: str,
     secrets: SecretRequest,
     current_user: User = Depends(get_current_user),
 ):
-    async with AsyncSessionLocal() as session:
-        # Проверяем, что пользователь имеет доступ к приложению через группу
-        result = await session.execute(
-            select(Application)
-            .select_from(Group)
-            .join(UserGroupRole)
-            .where(
-                Application.id == application_id, UserGroupRole.user_id == current_user
-            )
-        )
-        app_data = result.first()[0]
-        if not app_data:
-            raise HTTPException(status_code=403, detail="Not authorized")
+    try:
+        obj_application_id = ObjectId(application_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid application ID format.")
+    
+    application = db.applications.find_one({"_id": obj_application_id})
+    if not set(application.group_ids).intersection(current_user.group_ids):
+        raise HTTPException(status_code=403, detail="Access from group is permitted.")
+    
+    await secret_manager_module.process_request(application.id, secrets.secrets)
 
-        await secret_manager_module.process_request(app_data.uuid, secrets.secrets)
-
-        return {"status": "success"}
+    return {"status": "success"}
 
 
 @router.get("/applications/{application_id}/secrets/{secret_key}")
 async def retrieve_secret(
-    application_id: int,
+    application_id: str,
     secret_key: str,
     # secrets_keys: SecretQuery,
     current_user: User = Depends(get_current_user),
 ):
-    async with AsyncSessionLocal() as session:
-        # Проверяем, что пользователь имеет доступ к приложению через группу
-        result = await session.execute(
-            select(Application)
-            .select_from(Group)
-            .join(UserGroupRole)
-            .where(
-                Application.id == application_id, UserGroupRole.user_id == current_user
-            )
-        )
-        app_data = result.first()[0]
-        if not app_data:
-            raise HTTPException(status_code=403, detail="Not authorized")
-
-        secret = await secret_manager_module.process_request(app_data.uuid, secret_key)
+    try:
+        obj_application_id = ObjectId(application_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid application ID format.")
+    
+    application = db.applications.find_one({"_id": obj_application_id})
+    if not set(application.group_ids).intersection(current_user.group_ids):
+        raise HTTPException(status_code=403, detail="Access from group is permitted.")
+    
+    secret = await secret_manager_module.process_request(application.id, secret_key)
 
     return {"status": "success", "secret": secret}
+
+
+@router.delete("/applications/{application_id}/secrets/{secret_key}")
+async def delete_secret(
+    application_id: str,
+    secret_key: str,
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        obj_application_id = ObjectId(application_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid application ID format.")
+    
+    application = db.applications.find_one({"_id": obj_application_id})
+    if not set(application.group_ids).intersection(current_user.group_ids):
+        raise HTTPException(status_code=403, detail="Access from group is permitted.")
