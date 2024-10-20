@@ -9,7 +9,7 @@ class Secret(Base):
     __tablename__ = "secrets"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    application_id = Column(Integer, nullable=False)
+    application_id = Column(String, nullable=False)
     secret_key = Column(String, nullable=False, unique=True)
     secret_value = Column(LargeBinary, nullable=False)
     is_deleted = Column(Boolean, default=False)
