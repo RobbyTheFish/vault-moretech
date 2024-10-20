@@ -15,31 +15,32 @@ services:
     expose:
       - ${MONGO_DB_PORT}
 
-  postgres:
-    image: postgres:13
-    container_name: postgres
+  mongodb_auth:
+    image: mongo:5.0
+    container_name: mongodb_auth
     restart: always
     environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_AUTH_INITDB_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_AUTH_INITDB_PASSWORD}
     networks:
       - secret_network
+    volumes:
+      - mongo_auth_data:/data/db
+    expose:
+      - ${MONGO_AUTH_DB_PORT}
 
   secret_manager:
     build: .
     container_name: secret_manager
     restart: always
     environment:
-      POSTGRES_URI: ${POSTGRES_URI}
+      MONGO_AUTH_DB_URI: ${MONGO_AUTH_URI}
       MONGO_URI: ${MONGO_URI}
     ports:
       - "8000:8000"
     depends_on:
       - mongodb
-      - postgres
+      - mongodb_auth
     networks:
       - secret_network
     
@@ -53,5 +54,6 @@ networks:
 volumes:
   mongo_data:
     driver: local
-  postgres_data:
+  mongo_auth_data:
     driver: local
+  
