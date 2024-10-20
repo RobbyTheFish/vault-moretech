@@ -1,7 +1,7 @@
 from fastapi import FastAPI, Depends
 from fastapi.security import OAuth2PasswordBearer
 from api.swagger_config import custom_openapi
-from api.routes import auth, resources
+from api.routes import auth, resources, secrets
 from auth.db import db, startup_db_client
 #, groups, applications, secrets
 
@@ -22,6 +22,5 @@ app.openapi = lambda: custom_openapi(app)
 # Подключение роутеров
 app.include_router(auth.router, prefix="/auth", tags=["auth"])
 app.include_router(resources.router)
-#app.include_router(applications.router, prefix="/api", tags=["applications"])
-#app.include_router(secrets.router, prefix="/api", tags=["secrets"])
+app.include_router(secrets.router, prefix="/api", tags=["secrets"])
 
