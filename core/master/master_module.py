@@ -9,8 +9,6 @@
 
 from sqlalchemy.future import select
 
-from auth.db import AsyncSessionLocal
-from auth.models import TypeStrategiesEncrypt
 from core.db_conn.db_module import DatabaseModule
 from core.key_access.key_access_module import KeyAccessModule
 from core.secret_engines.secret_module import SecretEngineModule
