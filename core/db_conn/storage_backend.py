@@ -84,12 +84,15 @@ class RDBStorageBackend(AsyncStorageBackend):
             except SQLAlchemyError as e:
                 raise RuntimeError(f"Ошибка записи данных: {e}")
 
-    async def update(self, key: str, value: bytes):
+    async def update(self, key: str, value: bytes, application_id: str):
         async with self.session() as session:
             try:
                 stmt = (
                     update(Secret)
-                    .where(Secret.secret_key == key)
+                    .where(
+                        Secret.secret_key == key,
+                        Secret.application_id == application_id,
+                    )
                     .values(
                         secret_value=value,
                         updated_at=datetime.datetime.utcnow(),
@@ -104,12 +107,15 @@ class RDBStorageBackend(AsyncStorageBackend):
             except SQLAlchemyError as e:
                 raise RuntimeError(f"Ошибка обновления данных: {e}")
 
-    async def delete(self, key: str):
+    async def delete(self, key: str, application_id: str):
         async with self.session() as session:
             try:
                 stmt = (
                     update(Secret)
-                    .where(Secret.secret_key == key)
+                    .where(
+                        Secret.secret_key == key,
+                        Secret.application_id == application_id,
+                    )
                     .values(is_deleted=True, deleted_at=datetime.datetime.utcnow())
                 )
                 result = await session.execute(stmt)
@@ -175,10 +181,14 @@ class MongoDBStorageBackend(AsyncStorageBackend):
         except PyMongoError as e:
             raise RuntimeError(f"Ошибка обновления в MongoDB: {e}")
 
-    async def delete(self, key: str):
+    async def delete(self, key: str, application_id: str):
         try:
             result = await self.collection.update_one(
-                {"secret_key": key, "is_deleted": False},
+                {
+                    "secret_key": key,
+                    "is_deleted": False,
+                    "application_id": application_id,
+                },
                 {
                     "$set": {
                         "is_deleted": True,
