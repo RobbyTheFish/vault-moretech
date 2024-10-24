@@ -1,9 +1,9 @@
 # models_api_resources.py
-from pydantic import BaseModel, EmailStr, Field
-from typing import List, Optional
-from uuid import UUID
-from pydantic import ConfigDict
+
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
+
 from auth.models import AlgorithmEnum
+
 
 # Модели для Неймспейсов
 class NamespaceCreate(BaseModel):
@@ -88,7 +88,7 @@ class ApplicationResponse(BaseModel):
     id: str
     name: str
     group_id: str
-    group_ids: List[str] = []
+    group_ids: list[str] = []
 
     model_config = ConfigDict(
         orm_mode=True,

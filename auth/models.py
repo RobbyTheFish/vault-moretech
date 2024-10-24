@@ -1,14 +1,11 @@
 import enum
-from typing import List, Optional
-from pydantic import BaseModel, EmailStr, Field
-from bson import ObjectId
-import uuid
-from pydantic import ConfigDict, validator
 
+from bson import ObjectId
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 
 class MongoBaseModel(BaseModel):
-    id: Optional[ObjectId] = Field(alias="_id")
+    id: ObjectId | None = Field(alias="_id")
 
     model_config = ConfigDict(
         arbitrary_types_allowed=True,
@@ -20,21 +17,21 @@ class User(MongoBaseModel):
     name: str
     email: EmailStr
     password: str  # Хешированный пароль
-    group_ids: List[ObjectId] = Field(default_factory=list)
+    group_ids: list[ObjectId] = Field(default_factory=list)
 
 class Namespace(MongoBaseModel):
     name: str
-    group_ids: List[ObjectId] = Field(default_factory=list)
-    admin_ids: List[ObjectId] = Field(default_factory=list)
-    user_ids: List[ObjectId] = Field(default_factory=list)
+    group_ids: list[ObjectId] = Field(default_factory=list)
+    admin_ids: list[ObjectId] = Field(default_factory=list)
+    user_ids: list[ObjectId] = Field(default_factory=list)
 
 class Group(MongoBaseModel):
     name: str
     namespace_id: ObjectId
-    application_ids: List[ObjectId] = Field(default_factory=list)
-    admin_ids: List[ObjectId] = Field(default_factory=list)
-    engineer_ids: List[ObjectId] = Field(default_factory=list)
-    user_ids: List[ObjectId] = Field(default_factory=list)
+    application_ids: list[ObjectId] = Field(default_factory=list)
+    admin_ids: list[ObjectId] = Field(default_factory=list)
+    engineer_ids: list[ObjectId] = Field(default_factory=list)
+    user_ids: list[ObjectId] = Field(default_factory=list)
 
 class AlgorithmEnum(enum.Enum):
     aes128_gcm96 = "aes128-gcm96"
@@ -48,4 +45,4 @@ class Application(MongoBaseModel):
     name: str
     algorithm: str
     group_id: ObjectId
-    group_ids: List[ObjectId] = Field(default_factory=list)
+    group_ids: list[ObjectId] = Field(default_factory=list)

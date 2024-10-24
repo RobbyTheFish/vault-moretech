@@ -1,14 +1,15 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Body
-from api.models.auth import UserCreate, UserLogin, Token, UserResponse
-from auth.models import User
-from auth.db import db
-from passlib.context import CryptContext
-from auth.dependencies import get_current_user
-from typing import Optional
 from datetime import datetime, timedelta
+
 import jwt
-from auth.config import JWT_SECRET, JWT_ALGORITHM
 from bson import ObjectId
+from fastapi import APIRouter, Body, Depends, HTTPException, status
+from passlib.context import CryptContext
+
+from api.models.auth import Token, UserCreate, UserLogin, UserResponse
+from auth.config import JWT_ALGORITHM, JWT_SECRET
+from auth.db import db
+from auth.dependencies import get_current_user
+from auth.models import User
 
 router = APIRouter()
 
@@ -23,7 +24,7 @@ def get_password_hash(password: str) -> str:
     return pwd_context.hash(password)
 
 
-def create_access_token(*, data: dict, expires_delta: Optional[timedelta] = None) -> str:
+def create_access_token(*, data: dict, expires_delta: timedelta | None = None) -> str:
     to_encode = data.copy()
     if expires_delta:
         expire = datetime.utcnow() + expires_delta

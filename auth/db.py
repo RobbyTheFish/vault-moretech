@@ -1,8 +1,7 @@
+
 from motor.motor_asyncio import AsyncIOMotorClient
-from auth.config import MONGO_URI, MONGO_DB_NAME
-from auth.models import User, Namespace, Group, Application
-from bson import ObjectId
-import asyncio
+
+from auth.config import MONGO_DB_NAME, MONGO_URI
 
 client = AsyncIOMotorClient(MONGO_URI)
 db = client[MONGO_DB_NAME]
@@ -22,7 +21,7 @@ async def init_db():
     # Создание индексов для коллекции приложений
     await db.applications.create_index("name")
     await db.applications.create_index("group_id")
-    
+
     print("Database initialized with necessary indexes.")
 
 # Асинхронная инициализация базы данных при запуске

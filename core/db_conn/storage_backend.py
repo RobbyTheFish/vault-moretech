@@ -1,5 +1,5 @@
-import datetime
 from abc import ABC, abstractmethod
+from datetime import UTC, datetime
 
 from motor.motor_asyncio import AsyncIOMotorClient
 from pymongo.errors import PyMongoError
@@ -9,58 +9,67 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.future import select
 from sqlalchemy.orm import sessionmaker
 
-from core.db_conn.config import Config
-from core.db_conn.mongo_models import Secret_Mongo
+from core.db_conn.config import config
+from core.db_conn.mongo_models import AppsKeyMongo, SecretVersion
 from core.db_conn.rdb_models import Base, Secret
 
 
 class AsyncStorageBackend(ABC):
     @abstractmethod
-    async def read(self, key: str, application_id: str) -> bytes:
+    async def read_data(self, application_id: str, key: str) -> bytes:
         """Асинхронное чтение данных по ключу"""
         pass
 
     @abstractmethod
-    async def write(self, key: str, value: bytes, application_id: str):
+    async def write_data(self, application_id: str, key: str, value: bytes):
         """Асинхронная запись данных по ключу"""
         pass
 
     @abstractmethod
-    async def update(self, key: str, value: bytes, application_id: str):
+    async def update_data(self, application_id: str, key: str, value: bytes):
         """Асинхронное обновление данных по ключу"""
         pass
 
     @abstractmethod
-    async def delete(self, key: str, application_id: str):
+    async def delete_data(self, application_id: str, key: str):
         """Асинхронное удаление данных по ключу"""
+        pass
+
+    @abstractmethod
+    async def _read_key_app(self, application_id: str) -> bytes:
+        """Асинхронное чтение ключа приложения"""
+        pass
+
+    @abstractmethod
+    async def _write_key_app(self, application_id: str, app_key: bytes):
+        """Асинхронная запись ключа приложения"""
+        pass
+
+    @abstractmethod
+    async def _update_key_app(self, application_id: str, app_key: bytes):
+        """Асинхронное обновление ключа приложения"""
+        pass
+
+    @abstractmethod
+    async def _delete_key_app(self, application_id: str):
+        """Асинхронное удаление ключа приложения"""
         pass
 
 
 class RDBStorageBackend(AsyncStorageBackend):
-    def __init__(self, db_config: dict[str, str | int]):
-        db_url = f"postgresql+asyncpg://{db_config['db_user']}:{db_config['db_password']}@{db_config['db_host']}:{db_config['db_port']}/{db_config['db_name']}"
-        self.engine = create_async_engine(db_url, echo=True)
+    def __init__(self):
+        self.engine = create_async_engine(config.secret_db_uri, echo=True)
         self.session = sessionmaker(
             bind=self.engine,
             class_=AsyncSession,
             expire_on_commit=False,
         )
 
-        # Проверка подключения к базе данных
-        # self.check_connection()
-
-    # async def check_connection(self):
-    #     try:
-    #         async with self.engine.begin() as conn:
-    #             await conn.execute("SELECT 1")
-    #     except SQLAlchemyError as e:
-    #         raise RuntimeError(f"Ошибка подключения к базе данных: {e}")
-
     async def create_tables(self):
         async with self.engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
 
-    async def read(self, key: str, application_id: str) -> bytes:
+    async def read_data(self, key: str, application_id: str) -> bytes:
         async with self.session() as session:
             try:
                 result = await session.execute(
@@ -75,7 +84,7 @@ class RDBStorageBackend(AsyncStorageBackend):
             except SQLAlchemyError as e:
                 raise RuntimeError(f"Ошибка чтения данных: {e}")
 
-    async def write(self, key: str, value: bytes, application_id: str):
+    async def write_data(self, key: str, value: bytes, application_id: str):
         async with self.session() as session:
             try:
                 new_secret = Secret(
@@ -86,7 +95,7 @@ class RDBStorageBackend(AsyncStorageBackend):
             except SQLAlchemyError as e:
                 raise RuntimeError(f"Ошибка записи данных: {e}")
 
-    async def update(self, key: str, value: bytes, application_id: str):
+    async def update_data(self, key: str, value: bytes, application_id: str):
         async with self.session() as session:
             try:
                 stmt = (
@@ -97,7 +106,7 @@ class RDBStorageBackend(AsyncStorageBackend):
                     )
                     .values(
                         secret_value=value,
-                        updated_at=datetime.datetime.utcnow(),
+                        updated_at=datetime.datetime.now(UTC),
                         version=Secret.version + 1,
                     )
                 )
@@ -109,7 +118,7 @@ class RDBStorageBackend(AsyncStorageBackend):
             except SQLAlchemyError as e:
                 raise RuntimeError(f"Ошибка обновления данных: {e}")
 
-    async def delete(self, key: str, application_id: str):
+    async def delete_data(self, key: str, application_id: str):
         async with self.session() as session:
             try:
                 stmt = (
@@ -118,7 +127,7 @@ class RDBStorageBackend(AsyncStorageBackend):
                         Secret.secret_key == key,
                         Secret.application_id == application_id,
                     )
-                    .values(is_deleted=True, deleted_at=datetime.datetime.utcnow())
+                    .values(is_deleted=True, deleted_at=datetime.datetime.now(UTC))
                 )
                 result = await session.execute(stmt)
                 await session.commit()
@@ -128,54 +137,81 @@ class RDBStorageBackend(AsyncStorageBackend):
             except SQLAlchemyError as e:
                 raise RuntimeError(f"Ошибка удаления данных: {e}")
 
+    async def _read_key_app(self, application_id: str) -> bytes:
+        """Асинхронное чтение ключа приложения"""
+        pass
+
+    async def _write_key_app(self, application_id: str, app_key: bytes):
+        """Асинхронная запись ключа приложения"""
+        pass
+
+    async def _update_key_app(self, application_id: str, app_key: bytes):
+        """Асинхронное обновление ключа приложения"""
+        pass
+
+    async def _delete_key_app(self, application_id: str):
+        """Асинхронное удаление ключа приложения"""
+        pass
+
 
 class MongoDBStorageBackend(AsyncStorageBackend):
-    def __init__(self, db_config: dict[str, str | int]):
+    def __init__(self):
         try:
-            self.client = AsyncIOMotorClient(
-                host=db_config["db_host"],
-                port=db_config["db_port"],
-                username=db_config["db_user"],
-                password=db_config["db_password"],
-                authSource=db_config["db_user"],
-            )
-            self.db = self.client[db_config["db_name"]]
-            self.collection = self.db["secrets"]
+            self.client = AsyncIOMotorClient(config.secret_db_uri)
+            self.db = self.client[config.secret_db_name]
         except PyMongoError as e:
             raise RuntimeError(f"Ошибка подключения к MongoDB: {e}")
 
-    async def read(self, key: str, application_id: str) -> bytes:
+    async def read_data(self, application_id: str, key: str) -> bytes | None:
         try:
-            secret = await self.collection.find_one(
+            secret = await self.db.secrets.find_one(
                 {
-                    "secret_key": key,
-                    "is_deleted": False,
                     "application_id": application_id,
-                }
+                    "secrets.secret_key": key,
+                    "secrets.is_deleted": False,
+                },
+                {
+                    "secrets.$": 1  # Проекция, чтобы получить только совпадающий секрет
+                },
             )
-            return secret["secret_value"] if secret else None
+            if secret and "secrets" in secret:
+                return secret["secrets"][0]["secret_value"]
+            return None
         except PyMongoError as e:
             raise RuntimeError(f"Ошибка чтения из MongoDB: {e}")
 
-    async def write(self, key: str, value: bytes, application_id: str):
+    async def write_data(self, application_id: str, key: str, value: bytes) -> None:
         try:
-            new_secret = Secret_Mongo(
-                application_id=application_id, secret_key=key, secret_value=value
+            new_secret = SecretVersion(
+                secret_key=key,
+                secret_value=value,
+                created_at=datetime.now(UTC),
+                updated_at=datetime.now(UTC),
             )
-            await self.collection.insert_one(new_secret.model_dump())
+
+            # Добавляем новый секрет в список secrets
+            await self.db.secrets.update_one(
+                {"application_id": application_id},
+                {"$push": {"secrets": new_secret.model_dump()}},
+                upsert=True,  # Создает новый документ, если не найдено
+            )
         except PyMongoError as e:
             raise RuntimeError(f"Ошибка записи в MongoDB: {e}")
 
-    async def update(self, key: str, value: bytes):
+    async def update_data(self, application_id: str, key: str, value: bytes) -> None:
         try:
-            result = await self.collection.update_one(
-                {"secret_key": key, "is_deleted": False},
+            result = await self.db.secrets.update_one(
+                {
+                    "application_id": application_id,
+                    "secrets.secret_key": key,
+                    "secrets.is_deleted": False,
+                },
                 {
                     "$set": {
-                        "secret_value": value,
-                        "updated_at": datetime.datetime.utcnow(),
-                        "version": {"$add": ["$version", 1]},
-                    }
+                        "secrets.$.secret_value": value,
+                        "secrets.$.updated_at": datetime.now(UTC),
+                    },
+                    "$inc": {"secrets.$.version": 1},
                 },
             )
             if result.matched_count == 0:
@@ -183,18 +219,18 @@ class MongoDBStorageBackend(AsyncStorageBackend):
         except PyMongoError as e:
             raise RuntimeError(f"Ошибка обновления в MongoDB: {e}")
 
-    async def delete(self, key: str, application_id: str):
+    async def delete_data(self, application_id: str, key: str) -> None:
         try:
-            result = await self.collection.update_one(
+            result = await self.db.secrets.update_one(
                 {
-                    "secret_key": key,
-                    "is_deleted": False,
                     "application_id": application_id,
+                    "secrets.secret_key": key,
+                    "secrets.is_deleted": False,
                 },
                 {
                     "$set": {
-                        "is_deleted": True,
-                        "deleted_at": datetime.datetime.utcnow(),
+                        "secrets.$.is_deleted": True,
+                        "secrets.$.deleted_at": datetime.now(UTC),
                     }
                 },
             )
@@ -203,16 +239,90 @@ class MongoDBStorageBackend(AsyncStorageBackend):
         except PyMongoError as e:
             raise RuntimeError(f"Ошибка удаления в MongoDB: {e}")
 
+    async def _read_key_app(self, application_id: str) -> bytes | None:
+        try:
+            app_key_record = await self.db.apps_keys.find_one({"application_id": application_id})
+            return app_key_record["app_key"] if app_key_record else None
+        except PyMongoError as e:
+            raise RuntimeError(f"Ошибка чтения ключа приложения из MongoDB: {e}")
+
+    async def _write_key_app(self, application_id: str, app_key: bytes):
+        try:
+            new_app_key = AppsKeyMongo(
+                application_id=application_id,
+                app_key=app_key,
+                created_at=datetime.now(UTC),
+                updated_at=datetime.now(UTC),
+            )
+            await self.db.apps_keys.insert_one(new_app_key.model_dump())
+        except PyMongoError as e:
+            raise RuntimeError(f"Ошибка записи ключа приложения в MongoDB: {e}")
+
+    async def _update_key_app(self, application_id: str, app_key: bytes):
+        try:
+            result = await self.db.apps_keys.update_one(
+                {"application_id": application_id},
+                {
+                    "$set": {
+                        "app_key": app_key,
+                        "updated_at": datetime.now(UTC),
+                    },
+                    "$inc": {"version": 1},
+                },
+            )
+            if result.matched_count == 0:
+                raise ValueError(f"Ключ приложения для '{application_id}' не найден.")
+        except PyMongoError as e:
+            raise RuntimeError(f"Ошибка обновления ключа приложения в MongoDB: {e}")
+
+    async def _delete_key_app(self, application_id: str):
+        try:
+            result = await self.db.apps_keys.delete_one({"application_id": application_id})
+            if result.deleted_count == 0:
+                raise ValueError(f"Ключ приложения для '{application_id}' не найден.")
+        except PyMongoError as e:
+            raise RuntimeError(f"Ошибка удаления ключа приложения из MongoDB: {e}")
+
 
 class SecretStorage:
+    def __init__(self):
+        _type_db = {"rbdstorage": RDBStorageBackend, "mongodb": MongoDBStorageBackend}
+        self.db_conn = _type_db[config.secret_db_type]()
+
+    async def read_data(self, application_id: str, key: str) -> bytes | None:
+        return await self.db_conn.read_data(application_id, key)
+
+    async def write_data(self, application_id: str, key: str, value: bytes) -> dict[str, str]:
+        await self.db_conn.write_data(application_id, key, value)
+        return {"status": "success"}
+
+    async def update_data(self, application_id: str, key: str, value: bytes) -> dict[str, str]:
+        await self.db_conn.update_data(application_id, key, value)
+        return {"status": "success"}
+
+    async def delete_data(self, application_id: str, key: str) -> dict[str, str]:
+        await self.db_conn.delete(application_id, key)
+        return {"status": "success"}
+
+    async def _read_key_app(self, application_id: str) -> bytes | None:
+        return await self.db_conn._read_key_app(application_id)
+
+    async def _write_key_app(self, application_id: str, app_key: bytes) -> None:
+        await self.db_conn._write_key_app(application_id, app_key)
+
+    async def _update_key_app(self, application_id: str, app_key: bytes) -> None:
+        await self.db_conn._update_key_app(application_id, app_key)
+
+    async def _delete_key_app(self, application_id: str) -> None:
+        await self.db_conn._delete_key_app(application_id)
+
     @staticmethod
     async def create_storage(storage_type: str, /) -> AsyncStorageBackend:
-        config = Config().model_dump()
         if storage_type == "relational":
-            storage = RDBStorageBackend(config)
+            storage = RDBStorageBackend()
             await storage.create_tables()
         elif storage_type == "mongo":
-            storage = MongoDBStorageBackend(config)
+            storage = MongoDBStorageBackend()
         else:
             raise ValueError(f"Unsupported storage type: {storage_type}")
 

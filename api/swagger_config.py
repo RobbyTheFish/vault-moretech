@@ -1,5 +1,6 @@
-from fastapi.openapi.utils import get_openapi
 from fastapi import FastAPI
+from fastapi.openapi.utils import get_openapi
+
 
 def custom_openapi(app: FastAPI):
     if app.openapi_schema:
@@ -11,7 +12,7 @@ def custom_openapi(app: FastAPI):
         description="API для управления секретами",
         routes=app.routes,
     )
-    
+
     # Добавляем схему безопасности HTTPBearer
     openapi_schema["components"]["securitySchemes"] = {
         "HTTPBearer": {
@@ -22,6 +23,6 @@ def custom_openapi(app: FastAPI):
     }
 
     openapi_schema["security"] = [{"HTTPBearer": []}]
-    
+
     app.openapi_schema = openapi_schema
     return app.openapi_schema

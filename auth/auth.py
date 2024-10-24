@@ -1,25 +1,38 @@
 # auth.py
 from abc import ABC, abstractmethod
-from typing import Optional
+
+import jwt
+from bson import ObjectId
 from fastapi import HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
-from bson import ObjectId
-import jwt
 from jwt import PyJWTError
-from auth.config import JWT_SECRET, JWT_ALGORITHM, LDAP_SERVER, LDAP_BIND_DN, LDAP_BIND_PASSWORD, LDAP_SEARCH_BASE
-from auth.models import User
+from ldap3 import ALL, Connection, Server
+
+from auth.config import (
+    JWT_ALGORITHM,
+    JWT_SECRET,
+    LDAP_BIND_DN,
+    LDAP_SEARCH_BASE,
+    LDAP_SERVER,
+)
 from auth.db import db
-from ldap3 import Server, Connection, ALL
+from auth.models import User
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
+
 class AuthenticationStrategy(ABC):
     @abstractmethod
-    async def authenticate(self, token: Optional[str] = None, username: Optional[str] = None, password: Optional[str] = None) -> User:
+    async def authenticate(
+        self, token: str | None = None, username: str | None = None, password: str | None = None
+    ) -> User:
         pass
 
+
 class BearerAuthenticationStrategy(AuthenticationStrategy):
-    async def authenticate(self, token: Optional[str] = None, username: Optional[str] = None, password: Optional[str] = None) -> User:
+    async def authenticate(
+        self, token: str | None = None, username: str | None = None, password: str | None = None
+    ) -> User:
         if token is None:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -47,8 +60,11 @@ class BearerAuthenticationStrategy(AuthenticationStrategy):
             raise HTTPException(status_code=404, detail="User not found")
         return User(**user)
 
+
 class LDAPAuthenticationStrategy(AuthenticationStrategy):
-    async def authenticate(self, token: Optional[str] = None, username: Optional[str] = None, password: Optional[str] = None) -> User:
+    async def authenticate(
+        self, token: str | None = None, username: str | None = None, password: str | None = None
+    ) -> User:
         if not username or not password:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -56,14 +72,20 @@ class LDAPAuthenticationStrategy(AuthenticationStrategy):
                 headers={"WWW-Authenticate": "Basic"},
             )
         server = Server(LDAP_SERVER, get_info=ALL)
-        conn = Connection(server, user=f"{LDAP_BIND_DN}\\{username}", password=password, auto_bind=True)
+        conn = Connection(
+            server, user=f"{LDAP_BIND_DN}\\{username}", password=password, auto_bind=True
+        )
         if not conn.bind():
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="LDAP authentication failed",
                 headers={"WWW-Authenticate": "Basic"},
             )
-        conn.search(search_base=LDAP_SEARCH_BASE, search_filter=f'(sAMAccountName={username})', attributes=['cn', 'mail'])
+        conn.search(
+            search_base=LDAP_SEARCH_BASE,
+            search_filter=f"(sAMAccountName={username})",
+            attributes=["cn", "mail"],
+        )
         if not conn.entries:
             raise HTTPException(status_code=404, detail="User not found in LDAP")
         entry = conn.entries[0]
@@ -72,9 +94,12 @@ class LDAPAuthenticationStrategy(AuthenticationStrategy):
             raise HTTPException(status_code=404, detail="User not found in database")
         return User(**user)
 
+
 class Authenticator:
     def __init__(self, strategy: AuthenticationStrategy):
         self.strategy = strategy
 
-    async def authenticate(self, token: Optional[str] = None, username: Optional[str] = None, password: Optional[str] = None) -> User:
+    async def authenticate(
+        self, token: str | None = None, username: str | None = None, password: str | None = None
+    ) -> User:
         return await self.strategy.authenticate(token=token, username=username, password=password)

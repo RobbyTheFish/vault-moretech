@@ -1,9 +1,10 @@
 import asyncio
 
 import motor.motor_asyncio
-from core.config import Config
 from pymongo import ASCENDING, IndexModel
 from pymongo.errors import DuplicateKeyError
+
+from core.config import Config
 
 
 class DatabaseModule:
