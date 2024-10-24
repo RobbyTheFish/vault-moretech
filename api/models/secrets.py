@@ -2,7 +2,7 @@ from pydantic import BaseModel
 
 
 class SecretRequest(BaseModel):
-    secrets: dict 
+    secrets: dict
 
 
 class SecretQuery(BaseModel):

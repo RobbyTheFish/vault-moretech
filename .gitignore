@@ -4,3 +4,4 @@ alembic/versions
 alembic/__pycache__
 venv/
 logs/
+.ruff_cache

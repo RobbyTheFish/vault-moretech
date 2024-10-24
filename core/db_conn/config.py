@@ -5,11 +5,17 @@ load_dotenv()
 
 
 class Config(BaseSettings):
-    db_user: str
-    db_password: str
-    db_host: str
-    db_port: int
-    db_name: str
+    secret_db_uri: str
+    secret_db_type: str
+    secret_db_username: str
+    secret_db_password: str
+    secret_db_host: str = "None"
+    secret_db_port: int
+    secret_db_name: str
 
     class Config:
         env_file = ".env"
+        extra = "ignore"
+
+
+config = Config()

@@ -6,14 +6,14 @@ services:
     container_name: mongodb
     restart: always
     environment:
-      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_USERNAME}
-      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_PASSWORD}
+      MONGO_INITDB_ROOT_USERNAME: ${SECRET_DB_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${SECRET_DB_PASSWORD}
     networks:
       - secret_network
     volumes:
       - mongo_data:/data/db
     expose:
-      - ${MONGO_DB_PORT}
+      - ${SECRET_DB_PORT}
 
   mongodb_auth:
     image: mongo:5.0
@@ -35,7 +35,7 @@ services:
     restart: always
     environment:
       MONGO_AUTH_DB_URI: ${MONGO_AUTH_URI}
-      MONGO_URI: ${MONGO_URI}
+      SECRET_DB_URI: ${SECRET_DB_URI}
     ports:
       - "8000:8000"
     depends_on:
@@ -43,10 +43,9 @@ services:
       - mongodb_auth
     networks:
       - secret_network
-    
+
     volumes:
       - ./alembic/versions:/app/alembic/versions
-
 
 networks:
   secret_network:
@@ -56,4 +55,3 @@ volumes:
     driver: local
   mongo_auth_data:
     driver: local
-  

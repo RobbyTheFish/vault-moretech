@@ -1,6 +1,6 @@
 import os
 from abc import ABC, abstractmethod
-from typing import Any, Optional
+from typing import Any
 
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ec, ed25519, rsa
@@ -96,7 +96,7 @@ class KeyAccessModule:
     }
 
     @staticmethod
-    async def generate_app_key(algorithm: Optional[str] = None) -> tuple[str, bytes]:
+    async def generate_app_key(algorithm: str | None = None) -> tuple[str, bytes]:
         """Генерация ключа шифрования на основе указанного алгоритма."""
         algorithm = algorithm or KeyAccessModule._default_algorithm
         strategy = KeyAccessModule._strategies.get(algorithm)

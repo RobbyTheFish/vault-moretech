@@ -1,10 +1,10 @@
 # dependencies.py
+
 from fastapi import Depends, HTTPException, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from auth.auth import BearerAuthenticationStrategy, Authenticator
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+
+from auth.auth import Authenticator, BearerAuthenticationStrategy
 from auth.models import User
-from bson import ObjectId
-from typing import Optional
 
 security = HTTPBearer()
 

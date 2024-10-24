@@ -1,8 +1,9 @@
-from fastapi import FastAPI, Depends
-from fastapi.security import OAuth2PasswordBearer
-from api.swagger_config import custom_openapi
+from fastapi import FastAPI
+
 from api.routes import auth, resources, secrets
+from api.swagger_config import custom_openapi
 from auth.db import db, startup_db_client
+
 #, groups, applications, secrets
 
 app = FastAPI()
