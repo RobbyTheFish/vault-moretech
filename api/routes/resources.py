@@ -244,9 +244,8 @@ async def add_user_to_group(
 ):
     try:
         obj_group_id = ObjectId(group_id)
-        obj_user_id = ObjectId(add_user.user_id)
     except Exception:
-        raise HTTPException(status_code=400, detail="Invalid group ID or user ID format.")
+        raise HTTPException(status_code=400, detail="Invalid group ID format.")
     
     group = await db.groups.find_one({"_id": obj_group_id})
     if not group:
@@ -256,11 +255,12 @@ async def add_user_to_group(
         raise HTTPException(status_code=403, detail="Only group admins can add users.")
     
     # Проверка существования пользователя
-    user = await db.users.find_one({"_id": obj_user_id})
+    user = await db.users.find_one({"email": add_user.email})
     if not user:
         raise HTTPException(status_code=404, detail="User not found.")
     
     # Добавление пользователя в группу с указанной ролью
+    obj_user_id = ObjectId(user.get("_id"))
     if add_user.role == "admin":
         update_query = {"$addToSet": {"admin_ids": obj_user_id}}
     elif add_user.role == "engineer":
@@ -286,12 +286,13 @@ async def add_user_to_group(
 @router.post("/groups/{group_id}/remove_user", status_code=status.HTTP_200_OK)
 async def remove_user_from_group(
     group_id: str,
-    user_id: str = Body(...),
+    email: str = Body(...),
     current_user: User = Depends(get_current_user)
 ):
+    user = db.users.find_one({"email": email})
     try:
         obj_group_id = ObjectId(group_id)
-        obj_user_id = ObjectId(user_id)
+        obj_user_id = ObjectId(user.get("_id"))
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid group ID or user ID format.")
     

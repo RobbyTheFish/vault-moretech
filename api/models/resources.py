@@ -62,12 +62,12 @@ class GroupResponse(BaseModel):
     )
 
 class AddUserToNamespace(BaseModel):
-    user_id: str
+    email: EmailStr = Field(..., example="john.doe@example.com")
     is_admin: bool = False
 
 class AddUserToGroup(BaseModel):
-    user_id: str
-    role: str 
+    email: EmailStr = Field(..., example="john.doe@example.com")
+    role: str
 
 # Модели для Приложений
 class ApplicationCreate(BaseModel):
