@@ -2,10 +2,9 @@ from pydantic import BaseModel
 
 
 class SecretRequest(BaseModel):
-    app_uuid: str
     secrets: dict 
 
 
 class SecretQuery(BaseModel):
-    app_uuid: str
+    app_id: str
     secret_key: str

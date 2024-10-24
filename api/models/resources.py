@@ -3,7 +3,7 @@ from pydantic import BaseModel, EmailStr, Field
 from typing import List, Optional
 from uuid import UUID
 from pydantic import ConfigDict
-
+from auth.models import AlgorithmEnum
 
 # Модели для Неймспейсов
 class NamespaceCreate(BaseModel):
@@ -61,42 +61,33 @@ class GroupResponse(BaseModel):
         }
     )
 
-# Модели для Ролей
-class RoleAssign(BaseModel):
-    user_id: str = Field(..., example="60c72b2f9b1d4e3a5c8e4b7d")
-    group_id: Optional[str] = Field(None, example="60c72b2f9b1d4e3a5c8e4b7c")
-    namespace_id: Optional[str] = Field(None, example="60c72b2f9b1d4e3a5c8e4b7b")
-    role: str = Field(..., example="admin")  # Возможные роли: admin, engineer
+class AddUserToNamespace(BaseModel):
+    user_id: str
+    is_admin: bool = False
 
-    model_config = ConfigDict(
-        schema_extra={
-            "example": {
-                "user_id": "60c72b2f9b1d4e3a5c8e4b7d",
-                "group_id": "60c72b2f9b1d4e3a5c8e4b7c",
-                "role": "admin"
-            }
-        }
-    )
+class AddUserToGroup(BaseModel):
+    user_id: str
+    role: str 
 
 # Модели для Приложений
 class ApplicationCreate(BaseModel):
     name: str = Field(..., example="Inventory Service")
-    namespace_id: str = Field(..., example="60c72b2f9b1d4e3a5c8e4b7b")
+    group_id: str = Field(..., example="60c72b2f9b1d4e3a5c8e4b7b")
+    algorithm: str = Field(..., example=AlgorithmEnum.aes128_gcm96)
 
     model_config = ConfigDict(
         schema_extra={
             "example": {
                 "name": "Inventory Service",
-                "namespace_id": "60c72b2f9b1d4e3a5c8e4b7b"
+                "group_id": "60c72b2f9b1d4e3a5c8e4b7b"
             }
         }
     )
 
 class ApplicationResponse(BaseModel):
     id: str
-    uuid: UUID
     name: str
-    namespace_id: str
+    group_id: str
     group_ids: List[str] = []
 
     model_config = ConfigDict(
@@ -104,9 +95,8 @@ class ApplicationResponse(BaseModel):
         schema_extra={
             "example": {
                 "id": "60c72b2f9b1d4e3a5c8e4b7e",
-                "uuid": "123e4567-e89b-12d3-a456-426614174000",
                 "name": "Inventory Service",
-                "namespace_id": "60c72b2f9b1d4e3a5c8e4b7b",
+                "group_id": "60c72b2f9b1d4e3a5c8e4b7b",
                 "group_ids": ["60c72b2f9b1d4e3a5c8e4b7c"]
             }
         }

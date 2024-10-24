@@ -4,16 +4,17 @@ from api.models.resources import (
     NamespaceResponse,
     GroupCreate,
     GroupResponse,
-    RoleAssign,
+    AddUserToNamespace,
+    AddUserToGroup,
     ApplicationCreate,
     ApplicationResponse,
     GrantAccess
 )
-from auth.models import User, Group, Namespace, Application
+from auth.models import User, Group, Namespace, Application, AlgorithmEnum
 from auth.db import db
 from auth.dependencies import get_current_user
 from bson import ObjectId
-from typing import List
+from typing import List, Optional
 from pydantic import BaseModel
 
 router = APIRouter(
@@ -22,7 +23,7 @@ router = APIRouter(
     dependencies=[Depends(get_current_user)]
 )
 
-# Вспомогательные функции для проверки ролей
+# Вспомогательные функции для проверки прав
 async def is_admin_of_namespace(user: User, namespace_id: str) -> bool:
     namespace = await db.namespaces.find_one({"_id": ObjectId(namespace_id)})
     if not namespace:
@@ -51,7 +52,7 @@ async def is_admin_or_engineer_of_application(user: User, application: Applicati
             return True
     return False
 
-
+# --- Неймспейсы ---
 
 @router.post("/namespaces", response_model=NamespaceResponse, status_code=status.HTTP_201_CREATED)
 async def create_namespace(namespace: NamespaceCreate, current_user: User = Depends(get_current_user)):
@@ -61,9 +62,10 @@ async def create_namespace(namespace: NamespaceCreate, current_user: User = Depe
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Namespace with this name already exists."
         )
-    namespace_dict = namespace.dict()
+    namespace_dict = namespace.model_dump()
     namespace_dict["admin_ids"] = [ObjectId(current_user.id)]
     namespace_dict["group_ids"] = []
+    namespace_dict["user_ids"] = []
     result = await db.namespaces.insert_one(namespace_dict)
     created_namespace = await db.namespaces.find_one({"_id": result.inserted_id})
     return NamespaceResponse(
@@ -86,12 +88,89 @@ async def delete_namespace(namespace_id: str, current_user: User = Depends(get_c
         raise HTTPException(status_code=403, detail="Permission denied")
     
     # Удаление связанных групп и приложений
-    await db.groups.delete_many({"namespace_id": namespace_id})
+    groups_cursor = db.groups.find({"namespace_id": namespace_id})
+    async for group in groups_cursor:
+        # Удаление группы из пользователей
+        await db.users.update_many(
+            {"group_ids": group["_id"]},
+            {"$pull": {"group_ids": group["_id"]}}
+        )
+        # Удаление группы
+        await db.groups.delete_one({"_id": group["_id"]})
+    
+    # Удаление приложений, связанных с неймспейсом
     await db.applications.delete_many({"namespace_id": namespace_id})
     
     # Удаление неймспейса
     await db.namespaces.delete_one({"_id": obj_id})
     return
+
+@router.post("/namespaces/{namespace_id}/add_user", status_code=status.HTTP_200_OK)
+async def add_user_to_namespace(
+    namespace_id: str,
+    add_user: AddUserToNamespace,
+    current_user: User = Depends(get_current_user)
+):
+    try:
+        obj_namespace_id = ObjectId(namespace_id)
+        obj_user_id = ObjectId(add_user.user_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid namespace ID or user ID format.")
+    
+    namespace = await db.namespaces.find_one({"_id": obj_namespace_id})
+    if not namespace:
+        raise HTTPException(status_code=404, detail="Namespace not found.")
+    
+    if not await is_admin_of_namespace(current_user, namespace_id):
+        raise HTTPException(status_code=403, detail="Only namespace admins can add users.")
+    
+    # Проверка существования пользователя
+    user = await db.users.find_one({"_id": obj_user_id})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found.")
+    
+    update_query = {}
+    if add_user.is_admin:
+        update_query = {"$addToSet": {"admin_ids": obj_user_id}}
+    else:
+        update_query = {"$addToSet": {"user_ids": obj_user_id}}
+    
+    result = await db.namespaces.update_one({"_id": obj_namespace_id}, update_query)
+    
+    if result.modified_count == 0:
+        raise HTTPException(status_code=400, detail="User already added to the namespace.")
+    
+    return {"detail": "User added to the namespace successfully."}
+
+@router.post("/namespaces/{namespace_id}/remove_user", status_code=status.HTTP_200_OK)
+async def remove_user_from_namespace(
+    namespace_id: str,
+    user_id: str = Body(...),
+    current_user: User = Depends(get_current_user)
+):
+    try:
+        obj_namespace_id = ObjectId(namespace_id)
+        obj_user_id = ObjectId(user_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid namespace ID or user ID format.")
+    
+    namespace = await db.namespaces.find_one({"_id": obj_namespace_id})
+    if not namespace:
+        raise HTTPException(status_code=404, detail="Namespace not found.")
+    
+    if not await is_admin_of_namespace(current_user, namespace_id):
+        raise HTTPException(status_code=403, detail="Only namespace admins can remove users.")
+    
+    # Удаление пользователя из админов и обычных пользователей
+    result = await db.namespaces.update_one(
+        {"_id": obj_namespace_id},
+        {"$pull": {"admin_ids": obj_user_id, "user_ids": obj_user_id}}
+    )
+    
+    if result.modified_count == 0:
+        raise HTTPException(status_code=400, detail="User not found in the namespace.")
+    
+    return {"detail": "User removed from the namespace successfully."}
 
 # --- Группы ---
 
@@ -106,19 +185,27 @@ async def create_group(group: GroupCreate, current_user: User = Depends(get_curr
     if not namespace:
         raise HTTPException(status_code=404, detail="Namespace not found.")
     
-    existing_group = await db.groups.find_one({"name": group.name, "namespace_id": group.namespace_id})
+    existing_group = await db.groups.find_one({"name": group.name, "namespace_id": obj_namespace_id})
     if existing_group:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Group with this name already exists in the namespace."
         )
-    
-    group_dict = group.dict()
-    group_dict["admin_ids"] = [ObjectId(current_user.id)]
+        
+    namespace_admin_ids = namespace.get("admin_ids", [])
+    group_dict = group.model_dump()
+    group_dict["admin_ids"] = list(set([ObjectId(current_user.id)] + namespace_admin_ids))
     group_dict["engineer_ids"] = []
+    group_dict["user_ids"] = []
     group_dict["application_ids"] = []
     result = await db.groups.insert_one(group_dict)
     created_group = await db.groups.find_one({"_id": result.inserted_id})
+
+    await db.users.update_one(
+        {"_id": current_user.id},
+        {"$addToSet": {"group_ids": created_group.get("_id")}}
+    )
+
     return GroupResponse(
         id=str(created_group["_id"]),
         name=created_group["name"],
@@ -139,120 +226,181 @@ async def delete_group(group_id: str, current_user: User = Depends(get_current_u
     if not await is_admin_of_group(current_user, group_id):
         raise HTTPException(status_code=403, detail="Permission denied")
     
-    # Удаление ролей, связанных с группой
+    # Удаление пользователей из группы
     await db.users.update_many(
         {"group_ids": obj_group_id},
-        {"$pull": {"group_ids": obj_group_id}, "$pull": {"roles": {"group_id": group_id}}}
+        {"$pull": {"group_ids": obj_group_id}}
     )
     
     # Удаление группы
     await db.groups.delete_one({"_id": obj_group_id})
     return
 
-# --- Роли ---
-
-@router.post("/roles", status_code=status.HTTP_200_OK)
-async def assign_role(role_assign: RoleAssign, current_user: User = Depends(get_current_user)):
+@router.post("/groups/{group_id}/add_user", status_code=status.HTTP_200_OK)
+async def add_user_to_group(
+    group_id: str,
+    add_user: AddUserToGroup,
+    current_user: User = Depends(get_current_user)
+):
     try:
-        user_obj_id = ObjectId(role_assign.user_id)
+        obj_group_id = ObjectId(group_id)
+        obj_user_id = ObjectId(add_user.user_id)
     except Exception:
-        raise HTTPException(status_code=400, detail="Invalid user ID format.")
+        raise HTTPException(status_code=400, detail="Invalid group ID or user ID format.")
     
-    user = await db.users.find_one({"_id": user_obj_id})
+    group = await db.groups.find_one({"_id": obj_group_id})
+    if not group:
+        raise HTTPException(status_code=404, detail="Group not found.")
+    
+    if not await is_admin_of_group(current_user, group_id):
+        raise HTTPException(status_code=403, detail="Only group admins can add users.")
+    
+    # Проверка существования пользователя
+    user = await db.users.find_one({"_id": obj_user_id})
     if not user:
         raise HTTPException(status_code=404, detail="User not found.")
     
-    # Проверка прав текущего пользователя
-    if role_assign.group_id:
-        if not await is_admin_of_group(current_user, role_assign.group_id):
-            raise HTTPException(status_code=403, detail="Only group admins can assign roles.")
-    if role_assign.namespace_id:
-        if not await is_admin_of_namespace(current_user, role_assign.namespace_id):
-            raise HTTPException(status_code=403, detail="Only namespace admins can assign roles.")
+    # Добавление пользователя в группу с указанной ролью
+    if add_user.role == "admin":
+        update_query = {"$addToSet": {"admin_ids": obj_user_id}}
+    elif add_user.role == "engineer":
+        update_query = {"$addToSet": {"engineer_ids": obj_user_id}}
+    elif add_user.role == "user":
+        update_query = {"$addToSet": {"user_ids": obj_user_id}}
+    else:
+        raise HTTPException(status_code=400, detail="Invalid role specified.")
     
-    update_query = {}
-    if role_assign.group_id:
-        update_query["group_id"] = ObjectId(role_assign.group_id)
-    if role_assign.namespace_id:
-        update_query["namespace_id"] = ObjectId(role_assign.namespace_id)
-    
-    # Добавление роли пользователю
-    result = await db.users.update_one(
-        {"_id": user_obj_id},
-        {"$addToSet": {"roles": {"role": role_assign.role, **update_query}}}
-    )
+    result = await db.groups.update_one({"_id": obj_group_id}, update_query)
     
     if result.modified_count == 0:
-        raise HTTPException(status_code=400, detail="Role assignment failed or role already assigned.")
+        raise HTTPException(status_code=400, detail="User already has this role in the group.")
     
-    return {"detail": "Role assigned successfully."}
+    # Добавление группы в список групп пользователя, если ещё не добавлена
+    await db.users.update_one(
+        {"_id": obj_user_id},
+        {"$addToSet": {"group_ids": obj_group_id}}
+    )
+    
+    return {"detail": "User added to the group successfully."}
 
-@router.delete("/roles", status_code=status.HTTP_200_OK)
-async def remove_role(role_assign: RoleAssign, current_user: User = Depends(get_current_user)):
+@router.post("/groups/{group_id}/remove_user", status_code=status.HTTP_200_OK)
+async def remove_user_from_group(
+    group_id: str,
+    user_id: str = Body(...),
+    current_user: User = Depends(get_current_user)
+):
     try:
-        user_obj_id = ObjectId(role_assign.user_id)
+        obj_group_id = ObjectId(group_id)
+        obj_user_id = ObjectId(user_id)
     except Exception:
-        raise HTTPException(status_code=400, detail="Invalid user ID format.")
+        raise HTTPException(status_code=400, detail="Invalid group ID or user ID format.")
     
-    user = await db.users.find_one({"_id": user_obj_id})
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found.")
+    group = await db.groups.find_one({"_id": obj_group_id})
+    if not group:
+        raise HTTPException(status_code=404, detail="Group not found.")
     
-    # Проверка прав текущего пользователя
-    if role_assign.group_id:
-        if not await is_admin_of_group(current_user, role_assign.group_id):
-            raise HTTPException(status_code=403, detail="Only group admins can remove roles.")
-    if role_assign.namespace_id:
-        if not await is_admin_of_namespace(current_user, role_assign.namespace_id):
-            raise HTTPException(status_code=403, detail="Only namespace admins can remove roles.")
+    if not await is_admin_of_group(current_user, group_id):
+        raise HTTPException(status_code=403, detail="Only group admins can remove users.")
     
-    update_query = {}
-    if role_assign.group_id:
-        update_query["group_id"] = ObjectId(role_assign.group_id)
-    if role_assign.namespace_id:
-        update_query["namespace_id"] = ObjectId(role_assign.namespace_id)
-    
-    # Удаление роли у пользователя
-    result = await db.users.update_one(
-        {"_id": user_obj_id},
-        {"$pull": {"roles": {"role": role_assign.role, **update_query}}}
+    # Удаление пользователя из всех ролей группы
+    result = await db.groups.update_one(
+        {"_id": obj_group_id},
+        {"$pull": {"admin_ids": obj_user_id, "engineer_ids": obj_user_id, "user_ids": obj_user_id}}
     )
     
     if result.modified_count == 0:
-        raise HTTPException(status_code=400, detail="Role removal failed or role not assigned.")
+        raise HTTPException(status_code=400, detail="User not found in the group.")
     
-    return {"detail": "Role removed successfully."}
+    # Удаление группы из списка групп пользователя
+    await db.users.update_one(
+        {"_id": obj_user_id},
+        {"$pull": {"group_ids": obj_group_id}}
+    )
+    
+    return {"detail": "User removed from the group successfully."}
+
+@router.get("/groups/{group_id}/get_users_list", status_code=status.HTTP_200_OK)
+async def get_users_list(
+    group_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    try:
+        obj_group_id = ObjectId(group_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid group ID format.")
+    
+    group = await db.groups.find_one({"_id": obj_group_id})
+
+    if not group:
+        raise HTTPException(status_code=404, detail="Group not found.")
+    
+    if group.get("_id") not in current_user.group_ids:
+        raise HTTPException(status_code=400, detail="User not found in the group.")
+    users_list = [str(user_id) for user_id in group.get("user_ids", [])]
+    engineer_list = [str(engineer_id) for engineer_id in group.get("engineer_ids", [])]
+    admin_list = [str(admin_id) for admin_id in group.get("admin_ids", [])]
+    return {"status":"success", "users_list": users_list, "engineer_ids": engineer_list, "admin_ids": admin_list}
+
+@router.get("/groups/{group_id}/get_applications_list", status_code=status.HTTP_200_OK)
+async def get_applications_list(
+    group_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    try:
+        obj_group_id = ObjectId(group_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid group ID format.")
+    
+    group = await db.groups.find_one({"_id": obj_group_id})
+
+    if not group:
+        raise HTTPException(status_code=404, detail="Group not found.")
+    if group.get("_id") not in current_user.group_ids:
+        raise HTTPException(status_code=400, detail="User not found in the group.")
+    applications_list =  [str(application_id) for application_id in group.get("application_ids", [])]
+    return {"status":"success", "users_list": applications_list}
+
+
 
 # --- Приложения ---
 
 @router.post("/applications", response_model=ApplicationResponse, status_code=status.HTTP_201_CREATED)
 async def create_application(application: ApplicationCreate, current_user: User = Depends(get_current_user)):
     try:
-        obj_namespace_id = ObjectId(application.namespace_id)
+        obj_group_id = ObjectId(application.group_id)
     except Exception:
-        raise HTTPException(status_code=400, detail="Invalid namespace ID format.")
+        raise HTTPException(status_code=400, detail="Invalid group ID format.")
     
-    namespace = await db.namespaces.find_one({"_id": obj_namespace_id})
-    if not namespace:
-        raise HTTPException(status_code=404, detail="Namespace not found.")
+    group = await db.groups.find_one({"_id": obj_group_id})
+    if not group:
+        raise HTTPException(status_code=404, detail="Group not found.")
     
-    existing_app = await db.applications.find_one({"name": application.name, "namespace_id": application.namespace_id})
+    if group.get("_id") not in current_user.group_ids:
+        raise HTTPException(status_code=400, detail="User not found in the group.")
+    
+    existing_app = await db.applications.find_one(
+        {"name": application.name, "group_id": obj_group_id}
+    )
     if existing_app:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Application with this name already exists in the namespace."
+            detail="Application with this name already exists in the group."
         )
     
-    application_dict = application.dict()
+    # Проверка валидности алгоритма
+    if application.algorithm not in [e.value for e in AlgorithmEnum]:
+        raise HTTPException(status_code=400, detail="Algorithm not implemented.")
+    
+    application_dict = application.model_dump()
     application_dict["group_ids"] = []
-    application_dict["group_id"] = ObjectId(current_user.id)  # Группа создателя (может быть уточнено)
+    application_dict["group_id"] = obj_group_id  # Группа создателя
+    application_dict["namespace_id"] = group["namespace_id"]  # Добавление namespace_id из группы
     result = await db.applications.insert_one(application_dict)
     created_app = await db.applications.find_one({"_id": result.inserted_id})
     return ApplicationResponse(
         id=str(created_app["_id"]),
-        uuid=created_app["uuid"],
         name=created_app["name"],
-        namespace_id=str(created_app["namespace_id"]),
+        group_id=str(created_app["group_id"]),
         group_ids=[str(gid) for gid in created_app.get("group_ids", [])]
     )
 
@@ -268,11 +416,10 @@ async def delete_application(application_id: str, current_user: User = Depends(g
         raise HTTPException(status_code=404, detail="Application not found.")
     
     # Проверка прав:
-    # 1. Админы и инженеры могут удалять приложения
-    # 2. Только пользователь из группы создателя может удалять приложение
+    # 1. Администратор или инженер группы могут удалять приложение
     creator_group_id = application.get("group_id")
     if creator_group_id:
-        group = await db.groups.find_one({"_id": ObjectId(creator_group_id)})
+        group = await db.groups.find_one({"_id": creator_group_id})
         if group:
             if ObjectId(current_user.id) not in group.get("admin_ids", []) and ObjectId(current_user.id) not in group.get("engineer_ids", []):
                 raise HTTPException(status_code=403, detail="Permission denied")
@@ -280,7 +427,7 @@ async def delete_application(application_id: str, current_user: User = Depends(g
         raise HTTPException(status_code=400, detail="Application does not have a creator group.")
     
     # Удаление доступа к приложению из групп
-    await db.applications.update_many(
+    await db.applications.update_one(
         {"_id": obj_app_id},
         {"$set": {"group_ids": []}}
     )
@@ -305,14 +452,14 @@ async def grant_access(grant_access: GrantAccess, current_user: User = Depends(g
     if not group:
         raise HTTPException(status_code=404, detail="Group not found.")
     
-    if group.namespace_id != application.namespace_id:
+    if group["namespace_id"] != application["namespace_id"]:
         raise HTTPException(status_code=403, detail="Permission denied")
     
     # Проверка, что текущий пользователь является админом группы
-    if not await is_admin_of_group(current_user, application.group_id):
+    if not await is_admin_of_group(current_user, grant_access.group_id):
         raise HTTPException(status_code=403, detail="Only group admins can grant access.")
     
-    if grant_access.group_id in [str(gid) for gid in application.get("group_ids", [])]:
+    if obj_group_id in application.get("group_ids", []):
         raise HTTPException(status_code=400, detail="Access already granted to this group.")
     
     # Добавление группы в список групп с доступом к приложению
@@ -335,12 +482,15 @@ async def revoke_access(grant_access: GrantAccess, current_user: User = Depends(
     if not application:
         raise HTTPException(status_code=404, detail="Application not found.")
     
-    if grant_access.group_id not in [str(gid) for gid in application.get("group_ids", [])]:
+    if obj_group_id not in application.get("group_ids", []):
         raise HTTPException(status_code=400, detail="Access not granted to this group.")
     
-
-    # Проверка, что текущий пользователь является админом неймспейса
-    if not await is_admin_of_group(current_user, application.namespace_id):
+    # Проверка, что текущий пользователь является администратором группы
+    group = await db.groups.find_one({"_id": obj_group_id})
+    if not group:
+        raise HTTPException(status_code=404, detail="Group not found.")
+    
+    if not await is_admin_of_group(current_user, grant_access.group_id):
         raise HTTPException(status_code=403, detail="Only group admins can revoke access.")
     
     # Удаление группы из списка групп с доступом к приложению

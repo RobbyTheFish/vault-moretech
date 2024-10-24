@@ -20,7 +20,7 @@ async def on_shutdown():
 app.openapi = lambda: custom_openapi(app)
 
 # Подключение роутеров
-app.include_router(auth.router, prefix="/auth", tags=["auth"])
+app.include_router(auth.router, prefix="/auth", tags=["Auth"])
 app.include_router(resources.router)
-app.include_router(secrets.router, prefix="/api", tags=["secrets"])
+app.include_router(secrets.router)
 
