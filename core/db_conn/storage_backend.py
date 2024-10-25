@@ -410,7 +410,7 @@ class SecretStorage:
         return {"status": "success"}
 
     async def delete_data(self, application_id: str, key: str) -> dict[str, str]:
-        await self.db_conn.delete(application_id, key)
+        await self.db_conn.delete_data(application_id, key)
         return {"status": "success"}
 
     async def _read_key_app(self, application_id: str) -> bytes | None:
