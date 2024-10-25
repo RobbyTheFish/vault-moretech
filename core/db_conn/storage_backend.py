@@ -15,44 +15,150 @@ from core.db_conn.rdb_models import Base, Secret
 
 
 class AsyncStorageBackend(ABC):
+    """Abstract base class for asynchronous storage backends."""
+
     @abstractmethod
     async def read_data(self, application_id: str, key: str) -> bytes:
-        """Асинхронное чтение данных по ключу"""
+        """Asynchronously read data by key.
+
+        Parameters
+        ----------
+        application_id : str
+            The ID of the application.
+        key : str
+            The key for the data to be read.
+
+        Returns
+        -------
+        bytes
+            The data associated with the specified key.
+        """
         pass
 
     @abstractmethod
-    async def write_data(self, application_id: str, key: str, value: bytes):
-        """Асинхронная запись данных по ключу"""
+    async def write_data(self, application_id: str, key: str, value: bytes) -> dict[str, str]:
+        """Asynchronously write data by key.
+
+        Parameters
+        ----------
+        application_id : str
+            The ID of the application.
+        key : str
+            The key for the data to be written.
+        value : bytes
+            The data to be written.
+
+        Returns
+        -------
+        dict[str, str]
+            A dictionary containing the status of the write operation.
+        """
         pass
 
     @abstractmethod
-    async def update_data(self, application_id: str, key: str, value: bytes):
-        """Асинхронное обновление данных по ключу"""
+    async def update_data(self, application_id: str, key: str, value: bytes) -> dict[str, str]:
+        """Asynchronously update data by key.
+
+        Parameters
+        ----------
+        application_id : str
+            The ID of the application.
+        key : str
+            The key for the data to be updated.
+        value : bytes
+            The new data to be stored.
+
+        Returns
+        -------
+        dict[str, str]
+            A dictionary containing the status of the update operation.
+        """
         pass
 
     @abstractmethod
-    async def delete_data(self, application_id: str, key: str):
-        """Асинхронное удаление данных по ключу"""
+    async def delete_data(self, application_id: str, key: str) -> dict[str, str]:
+        """Asynchronously delete data by key.
+
+        Parameters
+        ----------
+        application_id : str
+            The ID of the application.
+        key : str
+            The key for the data to be deleted.
+
+        Returns
+        -------
+        dict[str, str]
+            A dictionary containing the status of the delete operation.
+        """
         pass
 
     @abstractmethod
     async def _read_key_app(self, application_id: str) -> bytes:
-        """Асинхронное чтение ключа приложения"""
+        """Asynchronously read the application key.
+
+        Parameters
+        ----------
+        application_id : str
+            The ID of the application.
+
+        Returns
+        -------
+        bytes
+            The application key associated with the specified application ID.
+        """
         pass
 
     @abstractmethod
-    async def _write_key_app(self, application_id: str, app_key: bytes):
-        """Асинхронная запись ключа приложения"""
+    async def _write_key_app(self, application_id: str, app_key: bytes) -> dict[str, str]:
+        """Asynchronously write the application key.
+
+        Parameters
+        ----------
+        application_id : str
+            The ID of the application.
+        app_key : bytes
+            The application key to be stored.
+
+        Returns
+        -------
+        dict[str, str]
+            A dictionary containing the status of the write operation.
+        """
         pass
 
     @abstractmethod
-    async def _update_key_app(self, application_id: str, app_key: bytes):
-        """Асинхронное обновление ключа приложения"""
+    async def _update_key_app(self, application_id: str, app_key: bytes) -> dict[str, str]:
+        """Asynchronously update the application key.
+
+        Parameters
+        ----------
+        application_id : str
+            The ID of the application.
+        app_key : bytes
+            The new application key to be stored.
+
+        Returns
+        -------
+        dict[str, str]
+            A dictionary containing the status of the update operation.
+        """
         pass
 
     @abstractmethod
-    async def _delete_key_app(self, application_id: str):
-        """Асинхронное удаление ключа приложения"""
+    async def _delete_key_app(self, application_id: str) -> dict[str, str]:
+        """Asynchronously delete the application key.
+
+        Parameters
+        ----------
+        application_id : str
+            The ID of the application.
+
+        Returns
+        -------
+        dict[str, str]
+            A dictionary containing the status of the delete operation.
+        """
         pass
 
 
@@ -69,7 +175,7 @@ class RDBStorageBackend(AsyncStorageBackend):
         async with self.engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
 
-    async def read_data(self, key: str, application_id: str) -> bytes:
+    async def read_data(self, application_id: str, key: str) -> bytes:
         async with self.session() as session:
             try:
                 result = await session.execute(
@@ -84,7 +190,7 @@ class RDBStorageBackend(AsyncStorageBackend):
             except SQLAlchemyError as e:
                 raise RuntimeError(f"Ошибка чтения данных: {e}")
 
-    async def write_data(self, key: str, value: bytes, application_id: str):
+    async def write_data(self, application_id: str, key: str, value: bytes):
         async with self.session() as session:
             try:
                 new_secret = Secret(
@@ -95,7 +201,7 @@ class RDBStorageBackend(AsyncStorageBackend):
             except SQLAlchemyError as e:
                 raise RuntimeError(f"Ошибка записи данных: {e}")
 
-    async def update_data(self, key: str, value: bytes, application_id: str):
+    async def update_data(self, application_id: str, key: str, value: bytes):
         async with self.session() as session:
             try:
                 stmt = (
@@ -118,7 +224,7 @@ class RDBStorageBackend(AsyncStorageBackend):
             except SQLAlchemyError as e:
                 raise RuntimeError(f"Ошибка обновления данных: {e}")
 
-    async def delete_data(self, key: str, application_id: str):
+    async def delete_data(self, application_id: str, key: str):
         async with self.session() as session:
             try:
                 stmt = (

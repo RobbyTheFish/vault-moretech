@@ -6,7 +6,12 @@ from core.secret_engines.secret_module import SecretEngineModule
 class SecretManagerModule:
     def __init__(self):
         """
-        Init key_access and secret_engine
+        Initialize the SecretManagerModule.
+
+        This sets up the necessary components:
+        - SecretStorage for managing secret data.
+        - KeyAccessModule for generating and managing application keys.
+        - SecretEngineModule for encrypting and decrypting secret values.
         """
         self.secret_storage = SecretStorage()
         self.key_access = KeyAccessModule()
@@ -16,11 +21,22 @@ class SecretManagerModule:
         self, app_id: str, data: dict[str, str] | str, algorithm: str = None
     ) -> dict[str, str]:
         """
-        Processing request from another module
+        Process a request from another module.
 
-        :param app_id: ID app.
-        :param data: data is key.
-        :return: Secret_engine result.
+        Parameters
+        ----------
+        app_id : str
+            ID of the application making the request.
+        data : dict[str, str] | str
+            Secret data to be processed. Can be a dictionary for saving secrets or a string for
+            retrieving a secret.
+        algorithm : str, optional
+            The encryption algorithm to use (default is None).
+
+        Returns
+        -------
+        dict[str, str]
+            Result from the secret engine, either a success status or the retrieved secret.
         """
 
         app_key = await self.secret_storage._read_key_app(app_id)
@@ -30,22 +46,52 @@ class SecretManagerModule:
             await self.secret_storage._write_key_app(app_id, app_key)
 
         if isinstance(data, dict):
-            result = await self.save_secrets(app_id, app_key, data, algorithm)
+            try:
+                # Attempt to save all secrets
+                result = await self.save_secrets(app_id, app_key, data, algorithm)
+            except Exception as e:
+                # If there is an error, you might want to handle a rollback
+                await self.rollback_secrets(app_id, data)
+                return {"error": str(e)}
         else:
             result = await self.retrieve_secret(app_id, app_key, data, algorithm)
 
         return result
 
+    async def rollback_secrets(self, app_id: str, secrets: dict[str, str]) -> None:
+        """Rollback the changes made during a save operation.
+
+        Parameters
+        ----------
+        app_id : str
+            ID of the application.
+        secrets : dict[str, str]
+            The secrets that were attempted to be saved.
+        """
+        for key in secrets.keys():
+            await self.secret_storage.delete_data(app_id, key)
+
     async def save_secrets(
         self, app_id: str, app_key: bytes, secrets: dict[str, str], algorithm: str
     ) -> dict[str, str]:
         """
-        Save secrets with secret_engine
+        Save secrets using the secret engine.
 
-        :param app_id: ID app.
-        :param app_key: Key of app
-        :param secrets: dict with keys and values
-        :return: status
+        Parameters
+        ----------
+        app_id : str
+            ID of the application.
+        app_key : bytes
+            Key associated with the application.
+        secrets : dict[str, str]
+            Dictionary containing keys and their corresponding secret values.
+        algorithm : str
+            The encryption algorithm to use for encrypting the secrets.
+
+        Returns
+        -------
+        dict[str, str]
+            Status indicating the success of the operation.
         """
         for key, value in secrets.items():
             encrypted_key_value = await self.secret_engine.encrypt(
@@ -59,12 +105,23 @@ class SecretManagerModule:
         self, app_id: str, app_key: bytes, key: str, algorithm: str
     ) -> dict[str, str]:
         """
-        Retrieve secrets grom secret engine
+        Retrieve a secret from the secret engine.
 
-        :param app_id: ID app.
-        :param app_key: Key of app.
-        :param key: dict with keys and values.
-        :return: Decrypted message
+        Parameters
+        ----------
+        app_id : str
+            ID of the application.
+        app_key : bytes
+            Key associated with the application.
+        key : str
+            The key for the secret to be retrieved.
+        algorithm : str
+            The encryption algorithm used for decrypting the secret.
+
+        Returns
+        -------
+        dict[str, str]
+            The decrypted secret or an error message if the secret is not found.
         """
         encrypted_value = await self.secret_storage.read_data(app_id, key)
 

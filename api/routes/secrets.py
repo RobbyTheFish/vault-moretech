@@ -90,32 +90,3 @@ async def delete_secret(
         raise HTTPException(status_code=501, detail="Failed to delete secret.")
 
     return {"status": "success"}
-
-
-@router.put("/applications/{application_id}/secrets/{secret_key}")
-async def delete_secret(
-    application_id: str,
-    secrets: SecretRequest,
-    current_user: User = Depends(get_current_user),
-):
-    try:
-        obj_application_id = ObjectId(application_id)
-    except Exception:
-        raise HTTPException(status_code=400, detail="Invalid application ID format.")
-
-    application = await db.applications.find_one({"_id": obj_application_id})
-    application_groups = application.get("group_ids", [])
-    if (
-        not set(application_groups).intersection(current_user.group_ids)
-        and application.get("group_id") not in current_user.group_ids
-    ):
-        raise HTTPException(status_code=403, detail="Access from group is not permitted.")
-    try:
-        await secret_manager_module.delete_secret(
-            application.get("_id"), application.get("algorithm"), secrets.secrets
-        )
-
-    except NotImplemented:
-        raise HTTPException(status_code=501, detail="Failed to update secret.")
-
-    return {"status": "success"}
