@@ -132,3 +132,6 @@ class SecretManagerModule:
             return {key: decrypted_value.decode()}
         else:
             return {"error": "Secret not found"}
+
+    async def delete_secret(self, app_id: str, key: str):
+        await self.secret_storage.delete_data(app_id, key)
