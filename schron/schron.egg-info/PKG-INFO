@@ -1,0 +1,8 @@
+Metadata-Version: 2.1
+Name: schron
+Version: 0.1.2
+Summary: CLI утилита для управления Secret API
+Classifier: Programming Language :: Python :: 3
+Classifier: Operating System :: OS Independent
+Requires-Dist: click
+Requires-Dist: requests

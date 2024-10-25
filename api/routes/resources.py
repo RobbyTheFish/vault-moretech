@@ -394,11 +394,9 @@ async def create_application(
             detail="Application with this name already exists in the group.",
         )
 
-    # Проверка валидности алгоритма
-    if application.algorithm not in [e.value for e in AlgorithmEnum]:
-        raise HTTPException(status_code=400, detail="Algorithm not implemented.")
-
     application_dict = application.model_dump()
+    if application_dict["algorithm"] not in [e.value for e in AlgorithmEnum]:
+        application_dict["algorithm"] = AlgorithmEnum.aes128_gcm96.value
     application_dict["group_ids"] = []
     application_dict["group_id"] = obj_group_id  # Группа создателя
     application_dict["namespace_id"] = group["namespace_id"]  # Добавление namespace_id из группы
