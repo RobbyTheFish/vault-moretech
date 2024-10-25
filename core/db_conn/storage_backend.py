@@ -327,21 +327,24 @@ class MongoDBStorageBackend(AsyncStorageBackend):
 
     async def delete_data(self, application_id: str, key: str) -> None:
         try:
-            result = await self.db.secrets.update_one(
-                {
-                    "application_id": application_id,
-                    "secrets.secret_key": key,
-                    "secrets.is_deleted": False,
-                },
-                {
-                    "$set": {
-                        "secrets.$.is_deleted": True,
-                        "secrets.$.deleted_at": datetime.now(UTC),
-                    }
-                },
-            )
+            filter_criteria = {
+                "application_id": application_id,
+                "secrets.secret_key": key,
+                "secrets.is_deleted": False,
+            }
+            update_data = {
+                "$set": {
+                    "secrets.$.is_deleted": True,
+                    "secrets.$.deleted_at": datetime.now(UTC),
+                }
+            }
+            result = await self.db.secrets.update_one(filter_criteria, update_data)
             if result.matched_count == 0:
                 raise ValueError(f"Секрет с ключом '{key}' не найден или уже удален.")
+            if result.modified_count == 0:
+                raise RuntimeError(
+                    f"Не удалось обновить секрет с ключом '{key}'. Возможно, данные уже были удалены."
+                )
         except PyMongoError as e:
             raise RuntimeError(f"Ошибка удаления в MongoDB: {e}")
 
