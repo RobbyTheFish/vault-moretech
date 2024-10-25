@@ -5,6 +5,8 @@ from cryptography.hazmat.primitives import hashes, hmac, serialization
 from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
+from core.config import Config
+
 
 class EncryptionStrategy(ABC):
     """Базовый интерфейс для стратегий шифрования."""
@@ -113,19 +115,23 @@ class SecretEngineModule:
             # "ecdsa-p521": ECDSAKeyEncryptionStrategy(),
             # "hmac": HMACStrategy(),
         }
+        self.__master_key = bytes.fromhex(Config().MASTER_KEY.strip())
+        self.__master_encrypt_decrypt = self._encryption_strategies.get(Config().TYPE_ENCRYPT)
 
     async def encrypt(self, algorithm: str, key: bytes, value: bytes) -> bytes:
         """Шифрование данных и возврат их."""
         strategy = self._encryption_strategies.get(algorithm)
         if not strategy:
             raise ValueError(f"Unsupported algorithm: {algorithm}")
-        return strategy.encrypt(key, value)
+        return self.__master_encrypt_decrypt.encrypt(
+            self.__master_key, strategy.encrypt(key, value)
+        )
 
-    async def decrypt(
-        self, algorithm: str, key: bytes, encrypted_value: bytes
-    ) -> bytes:
+    async def decrypt(self, algorithm: str, key: bytes, encrypted_value: bytes) -> bytes:
         """Дешифрование данных и отдача их пользователю."""
         strategy = self._encryption_strategies.get(algorithm)
         if not strategy:
             raise ValueError(f"Unsupported algorithm: {algorithm}")
-        return strategy.decrypt(key, encrypted_value)
+        return strategy.decrypt(
+            key, self.__master_encrypt_decrypt.decrypt(self.__master_key, encrypted_value)
+        )
