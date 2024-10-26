@@ -1,7 +1,7 @@
 import uvicorn
-from api.api import app
 from loguru import logger
 
+from api.api import app
 
 if __name__ == "__main__":
     # logger.remove()

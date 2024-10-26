@@ -4,6 +4,7 @@ from pydantic import BaseModel
 
 
 class SecretVersion(BaseModel):
+    application_id: str
     secret_key: str
     secret_value: bytes
     is_deleted: bool = False
@@ -14,9 +15,9 @@ class SecretVersion(BaseModel):
     deleted_at: datetime = datetime.now(UTC) + timedelta(days=10 * 365.25)
 
 
-class SecretMongo(BaseModel):
-    application_id: str
-    secrets: list[SecretVersion]
+# class SecretMongo(BaseModel):
+# application_id: str
+# secrets: list[SecretVersion]
 
 
 class AppsKeyMongo(BaseModel):

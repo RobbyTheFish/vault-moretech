@@ -1,0 +1,52 @@
+[project]
+name = "vault-moretech"
+version = "0.1.0"
+description = "Default template for PDM package"
+authors = [
+    {name = "s1lver29", email = "nikitaselver@yandex.ru"},
+]
+dependencies = [
+    "alembic>=1.13.3",
+    "annotated-types>=0.7.0",
+    "anyio>=4.6.2.post1",
+    "asyncpg>=0.30.0",
+    "click>=8.1.7",
+    "colorama>=0.4.6",
+    "cryptography>=43.0.3",
+    "dnspython>=2.7.0",
+    "python-dotenv>=1.0.1",
+    "fastapi>=0.115.3",
+    "greenlet>=3.1.1",
+    "ldap3>=2.9.1",
+    "h11>=0.14.0",
+    "pyjwt>=2.9.0",
+    "idna>=3.10",
+    "motor>=3.6.0",
+    "psycopg2-binary>=2.9.10",
+    "pydantic>=2.9.2",
+    "pydantic-core>=2.23.4",
+    "pydantic[email]>=2.9.2",
+    "pydantic-settings>=2.6.0",
+    "pymongo>=4.9.2",
+    "python-jose>=3.3.0",
+    "python-multipart>=0.0.12",
+    "sniffio>=1.3.1",
+    "SQLAlchemy>=2.0.36",
+    "starlette>=0.41.0",
+    "typing-extensions>=4.12.2",
+    "uvicorn>=0.32.0",
+    "loguru>=0.7.2",
+    "passlib[bcrypt]>=1.7.4",
+]
+requires-python = "==3.12.*"
+readme = "README.md"
+license = {text = "MIT"}
+
+
+[tool.pdm]
+distribution = false
+
+[tool.pdm.dev-dependencies]
+dev = [
+    "ruff>=0.7.1",
+]
