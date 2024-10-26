@@ -216,6 +216,39 @@ async def create_group(group: GroupCreate, current_user: User = Depends(get_curr
     )
 
 
+
+
+@router.get("/groups", status_code=status.HTTP_200_OK)
+async def get_user_groups_list(current_user: User = Depends(get_current_user)):
+
+    user = await db.users.find_one({"_id": current_user.id})
+    groups_list = [
+        str(group_id) for group_id in user.get("group_ids", [])
+    ]
+    return {"status": "success", "list_ids": groups_list}
+
+@router.get("/groups/{group_id}", response_model=GroupResponse, status_code=status.HTTP_200_OK)
+async def get_group_by_id(
+    group_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    try:
+        obj_group_id = ObjectId(group_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid group ID format.")
+    
+    group = await db.groups.find_one({"_id": obj_group_id})
+    if not group:
+        raise HTTPException(status_code=404, detail="Group not found.")
+    
+    return GroupResponse(
+        id=str(group["_id"]),
+        name=group["name"],
+        namespace_id=str(group["namespace_id"]),
+    )
+
+
+
 @router.delete("/groups/{group_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_group(group_id: str, current_user: User = Depends(get_current_user)):
     try:
@@ -361,7 +394,7 @@ async def get_applications_list(group_id: str, current_user: User = Depends(get_
     applications_list = [
         str(application_id) for application_id in group.get("application_ids", [])
     ]
-    return {"status": "success", "users_list": applications_list}
+    return {"status": "success", "applications_list": applications_list}
 
 
 # --- Приложения ---
@@ -409,6 +442,36 @@ async def create_application(
         group_ids=[str(gid) for gid in created_app.get("group_ids", [])],
     )
 
+@router.get("/applications/{application_id}", response_model=ApplicationResponse, status_code=status.HTTP_200_OK)
+async def get_application_by_id(
+    group_id: str,
+    application_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    try:
+        obj_group_id = ObjectId(group_id)
+        obj_application_id = ObjectId(application_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid group or application ID format.")
+    
+    group = await db.groups.find_one({"_id": obj_group_id})
+    if not group:
+        raise HTTPException(status_code=404, detail="Group not found.")
+    
+    user = await db.users.find_one({"_id": current_user.id})
+    if group.get("_id") not in user.get("group_ids", []):
+        raise HTTPException(status_code=404, detail="Access not permitted.")
+    
+    application = await db.applications.findone({"_id": obj_application_id})
+    if not application:
+        raise HTTPException(status_code=404, detail="Application not found.")
+    
+    return ApplicationResponse(
+        id=str(application["_id"]),
+        name=application["name"],
+        group_id=str(application["group_id"]),
+        group_ids=application.get("group_ids", [])
+    )
 
 @router.delete("/applications/{application_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_application(application_id: str, current_user: User = Depends(get_current_user)):
