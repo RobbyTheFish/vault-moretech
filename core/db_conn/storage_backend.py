@@ -270,81 +270,99 @@ class MongoDBStorageBackend(AsyncStorageBackend):
 
     async def read_data(self, application_id: str, key: str) -> bytes | None:
         try:
+            # Ищем последнюю версию секрета, которая не удалена
             secret = await self.db.secrets.find_one(
                 {
                     "application_id": application_id,
-                    "secrets.secret_key": key,
-                    "secrets.is_deleted": False,
+                    "secret_key": key,
+                    "is_deleted": False,
                 },
-                {
-                    "secrets.$": 1  # Проекция, чтобы получить только совпадающий секрет
-                },
+                sort=[("version", -1)],  # Сортировка по убыванию версии
             )
-            if secret and "secrets" in secret:
-                return secret["secrets"][0]["secret_value"]
+            if secret:
+                return secret["secret_value"]
             return None
         except PyMongoError as e:
             raise RuntimeError(f"Ошибка чтения из MongoDB: {e}")
 
     async def write_data(self, application_id: str, key: str, value: bytes) -> None:
         try:
+            # Проверяем, существует ли уже секрет с данным ключом
+            existing_secret = await self.db.secrets.find_one(
+                {"application_id": application_id, "secret_key": key}
+            )
+            if existing_secret:
+                raise ValueError(f"Секрет с ключом '{key}' уже существует.")
+
+            # Создаем новую запись с версией 1
             new_secret = SecretVersion(
+                application_id=application_id,
                 secret_key=key,
                 secret_value=value,
+                version=1,
                 created_at=datetime.now(UTC),
                 updated_at=datetime.now(UTC),
             )
 
-            # Добавляем новый секрет в список secrets
-            await self.db.secrets.update_one(
-                {"application_id": application_id},
-                {"$push": {"secrets": new_secret.model_dump()}},
-                upsert=True,  # Создает новый документ, если не найдено
-            )
+            # Вставляем новую запись в коллекцию
+            await self.db.secrets.insert_one(new_secret.dict())
         except PyMongoError as e:
             raise RuntimeError(f"Ошибка записи в MongoDB: {e}")
 
     async def update_data(self, application_id: str, key: str, value: bytes) -> None:
         try:
-            result = await self.db.secrets.update_one(
+            # Помечаем текущую версию как удаленную
+            await self.db.secrets.update_one(
                 {
                     "application_id": application_id,
-                    "secrets.secret_key": key,
-                    "secrets.is_deleted": False,
+                    "secret_key": key,
+                    "is_deleted": False,
                 },
-                {
-                    "$set": {
-                        "secrets.$.secret_value": value,
-                        "secrets.$.updated_at": datetime.now(UTC),
-                    },
-                    "$inc": {"secrets.$.version": 1},
-                },
+                {"$set": {"is_deleted": True}},
             )
-            if result.matched_count == 0:
-                raise ValueError(f"Секрет с ключом '{key}' не найден или удален.")
+
+            # Находим последнюю версию секрета
+            last_version = await self.db.secrets.find_one(
+                {
+                    "application_id": application_id,
+                    "secret_key": key,
+                },
+                sort=[("version", -1)],  # Сортировка по убыванию версии
+            )
+
+            # Добавляем новую версию
+            new_version = last_version["version"] + 1 if last_version else 1
+            new_secret = SecretVersion(
+                application_id=application_id,
+                secret_key=key,
+                secret_value=value,
+                version=new_version,
+                created_at=datetime.now(UTC),
+                updated_at=datetime.now(UTC),
+            )
+
+            await self.db.secrets.insert_one(new_secret.dict())
         except PyMongoError as e:
             raise RuntimeError(f"Ошибка обновления в MongoDB: {e}")
 
     async def delete_data(self, application_id: str, key: str) -> None:
         try:
-            filter_criteria = {
-                "application_id": application_id,
-                "secrets.secret_key": key,
-                "secrets.is_deleted": False,
-            }
-            update_data = {
-                "$set": {
-                    "secrets.$.is_deleted": True,
-                    "secrets.$.deleted_at": datetime.now(UTC),
-                }
-            }
-            result = await self.db.secrets.update_one(filter_criteria, update_data)
+            # Находим последнюю версию секрета, которая не помечена как удаленная
+            result = await self.db.secrets.update_one(
+                {
+                    "application_id": application_id,
+                    "secret_key": key,
+                    "is_deleted": False,
+                },
+                {
+                    "$set": {
+                        "is_deleted": True,
+                        "deleted_at": datetime.now(UTC),
+                    }
+                },
+            )
             if result.matched_count == 0:
                 raise ValueError(f"Секрет с ключом '{key}' не найден или уже удален.")
-            if result.modified_count == 0:
-                raise RuntimeError(
-                    f"Не удалось обновить секрет с ключом '{key}'. Возможно, данные уже были удалены."
-                )
         except PyMongoError as e:
             raise RuntimeError(f"Ошибка удаления в MongoDB: {e}")
 
