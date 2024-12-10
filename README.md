@@ -1,4 +1,4 @@
-![image](https://github.com/user-attachments/assets/02b5a147-f3cb-40a5-97cd-81f747da8daa)# Аналог Hashicorp Vault для хакатона MORE.Tech 2024
+# Аналог Hashicorp Vault для хакатона MORE.Tech 2024
 Данное решение было разработано в рамках работы над треком Vault на хакатоне more.tech (https://moretech.vtb.ru/vault).
 Проект — менеджер секретов для удобного и безопасного хранения секретов, с которыми взаимодействуют сервисы.
 
