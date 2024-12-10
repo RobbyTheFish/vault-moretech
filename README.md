@@ -3,9 +3,9 @@
 Проект — менеджер секретов для удобного и безопасного хранения секретов, с которыми взаимодействуют сервисы.
 
 ## Контрибьюторы
-Озеров Ярослав — github.com/RobbyTheFish (backend/devops) \n
-Никита Селивёрстов — github.com/s1lver29 (backend/core) \n
-Черкащенко Анастасия (PM/Design)
+- Озеров Ярослав — github.com/RobbyTheFish (backend/devops)
+- Никита Селивёрстов — github.com/s1lver29 (backend/core)
+- Черкащенко Анастасия (PM/Design)
 
 ## Использованные технологии
 - Python 3.12
